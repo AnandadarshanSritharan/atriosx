@@ -1,14 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-/**
- * Resets window scroll position to (0, 0) whenever the route changes in React Router.
- * Supports anchor hashes (#section-id) for intra-page links.
- */
+// Disable automatic mobile browser scroll restoration so page transitions always start at top
+if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+  try {
+    window.history.scrollRestoration = 'manual';
+  } catch (e) {
+    // Ignore in unsupported environments
+  }
+}
+
 export function ScrollToTop() {
   const { pathname, search, hash } = useLocation();
 
-  useEffect(() => {
+  const resetScroll = () => {
     if (hash) {
       const element = document.getElementById(hash.slice(1));
       if (element) {
@@ -17,12 +22,37 @@ export function ScrollToTop() {
       }
     }
 
-    // Instantly reset scroll to top so the next page always starts from the top
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: 'instant' as ScrollBehavior,
-    });
+    // Reset all possible scroll targets across mobile and desktop browsers
+    try {
+      window.scrollTo(0, 0);
+    } catch (e) {}
+
+    if (document.documentElement) {
+      document.documentElement.scrollTop = 0;
+    }
+    if (document.body) {
+      document.body.scrollTop = 0;
+    }
+  };
+
+  // Run before paint
+  useLayoutEffect(() => {
+    resetScroll();
+  }, [pathname, search, hash]);
+
+  // Run after paint + safety timers to defeat mobile browser async scroll restoration
+  useEffect(() => {
+    resetScroll();
+
+    const frameId = requestAnimationFrame(resetScroll);
+    const timer1 = setTimeout(resetScroll, 20);
+    const timer2 = setTimeout(resetScroll, 80);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
   }, [pathname, search, hash]);
 
   return null;
