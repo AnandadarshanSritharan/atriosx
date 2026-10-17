@@ -38,6 +38,8 @@ import SettingsPage from './pages/admin/SettingsPage';
 import UsersPage from './pages/admin/UsersPage';
 import AuditLogsPage from './pages/admin/AuditLogsPage';
 
+import { ScrollToTop } from './components/shared/ScrollToTop';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -53,6 +55,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<PublicLayout />}>
