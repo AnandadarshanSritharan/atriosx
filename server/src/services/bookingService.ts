@@ -39,6 +39,7 @@ export function getColomboNow(timezone = 'Asia/Colombo') {
 interface AvailabilityParams {
   facilityId: string;
   date: string; // YYYY-MM-DD
+  durationMinutes?: number;
 }
 
 interface BookingConflictParams {
@@ -168,26 +169,32 @@ export const bookingService = {
       status: { $in: ['pending', 'confirmed'] },
     }).select('startTime endTime');
     
+    const checkDuration = Number(params.durationMinutes || minDuration);
+
     while (currentMinutes + minDuration <= closeMinutes) {
       const slotH = Math.floor(currentMinutes / 60);
       const startH = slotH >= 24 ? slotH % 24 : slotH;
       const startM = currentMinutes % 60;
       const slotStart = `${String(startH).padStart(2,'0')}:${String(startM).padStart(2,'0')}`;
       
-      // Check if this start time conflicts with any booking
-      const endMinutesForCheck = currentMinutes + minDuration;
-      const endSlotH = Math.floor(endMinutesForCheck / 60);
-      const endH = endSlotH;
-      const endM = endMinutesForCheck % 60;
+      // Calculate end time based on the requested session duration
+      const slotEndMinutes = currentMinutes + checkDuration;
+      const exceedsClosing = slotEndMinutes > closeMinutes;
+
+      const endSlotH = Math.floor(slotEndMinutes / 60);
+      const endH = endSlotH >= 24 ? endSlotH % 24 : endSlotH;
+      const endM = slotEndMinutes % 60;
       const slotEnd = `${String(endH).padStart(2,'0')}:${String(endM).padStart(2,'0')}`;
       
+      // Check if this slot conflicts with any existing booking for the full session duration
       const isConflict = existingBookings.some(b => 
         b.startTime < slotEnd && b.endTime > slotStart
       );
 
       const isPast = isToday && (currentMinutes < nowMinutes);
       
-      slots.push({ time: slotStart, available: !isConflict && !isPast });
+      // Slot is only available if it has not passed, does not conflict, and finishes before/at closing time
+      slots.push({ time: slotStart, available: !isConflict && !isPast && !exceedsClosing });
       currentMinutes += interval;
     }
     

@@ -608,7 +608,7 @@ export default function BookingWizard() {
                     <button
                       key={d}
                       type="button"
-                      onClick={() => setData({ ...data, duration: d })}
+                      onClick={() => setData({ ...data, duration: d, startTime: '' })}
                       style={{
                         padding: '10px 18px',
                         background: data.duration === d ? '#c0c0c0' : '#161616',
@@ -643,36 +643,55 @@ export default function BookingWizard() {
               ) : !availData?.slots?.length ? (
                 <p style={{ color: '#6b6b6b', fontSize: '0.85rem' }}>No time slots available for this date. Please try another day.</p>
               ) : (
-                <>
-                  {availData.slots.every((s: any) => !s.available) && (
-                    <div style={{
-                      background: '#b3393918',
-                      border: '1px solid #b3393950',
-                      borderRadius: '8px',
-                      padding: '12px 16px',
-                      marginBottom: '16px',
-                      color: '#ff8585',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                    }}>
-                      All session slots for this date have already passed or are fully booked. Please go back to Step 2 and choose an upcoming date.
-                    </div>
-                  )}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '10px' }}>
-                  {availData.slots.map((slot: any, i: number) => (
-                    <button key={i} disabled={!slot.available} onClick={() => setData({ ...data, startTime: slot.time })}
-                      style={{
-                        padding: '11px 0', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: slot.available ? 'pointer' : 'not-allowed',
-                        background: data.startTime === slot.time ? '#c0c0c0' : slot.available ? '#161616' : '#0d0d0d',
-                        border: `1px solid ${data.startTime === slot.time ? '#c0c0c0' : slot.available ? '#2a2a2a' : '#1a1a1a'}`,
-                        color: data.startTime === slot.time ? '#000' : slot.available ? '#c0c0c0' : '#3a3a3a',
-                        textDecoration: !slot.available ? 'line-through' : 'none',
-                      }}>
-                      {slot.time}
-                    </button>
-                  ))}
-                  </div>
-                </>
+                {(() => {
+                  // Compute close boundary from availData
+                  const [ch, cm] = (availData?.closeTime || '23:59').split(':').map(Number);
+                  const closeMinutes = ch * 60 + cm;
+                  const selectedDuration = data.duration || 60;
+
+                  // Augment each slot: also mark unavailable if it would exceed closing time
+                  const slotsWithClose = availData.slots.map((slot: any) => {
+                    const [sh, sm] = slot.time.split(':').map(Number);
+                    const slotStartMins = sh * 60 + sm;
+                    const exceedsClosing = slotStartMins + selectedDuration > closeMinutes;
+                    return { ...slot, available: slot.available && !exceedsClosing };
+                  });
+
+                  const allUnavailable = slotsWithClose.every((s: any) => !s.available);
+
+                  return (
+                    <>
+                      {allUnavailable && (
+                        <div style={{
+                          background: '#b3393918',
+                          border: '1px solid #b3393950',
+                          borderRadius: '8px',
+                          padding: '12px 16px',
+                          marginBottom: '16px',
+                          color: '#ff8585',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                        }}>
+                          All session slots for this date have already passed or are fully booked. Please go back to Step 2 and choose an upcoming date.
+                        </div>
+                      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '10px' }}>
+                        {slotsWithClose.map((slot: any, i: number) => (
+                          <button key={i} disabled={!slot.available} onClick={() => setData({ ...data, startTime: slot.time })}
+                            style={{
+                              padding: '11px 0', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: slot.available ? 'pointer' : 'not-allowed',
+                              background: data.startTime === slot.time ? '#c0c0c0' : slot.available ? '#161616' : '#0d0d0d',
+                              border: `1px solid ${data.startTime === slot.time ? '#c0c0c0' : slot.available ? '#2a2a2a' : '#1a1a1a'}`,
+                              color: data.startTime === slot.time ? '#000' : slot.available ? '#c0c0c0' : '#3a3a3a',
+                              textDecoration: !slot.available ? 'line-through' : 'none',
+                            }}>
+                            {slot.time}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
               )}
             </div>
 
