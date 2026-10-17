@@ -223,28 +223,16 @@ export default function LandingPage() {
                 const platformLabel = catObj?.name || game.platform || 'PlayStation 5';
 
                 return (
-                  <Link
+                  <div
                     key={game._id}
-                    to={catId ? `/book?category=${catId}` : '/book'}
                     style={{
                       ...S.card,
                       textDecoration: 'none',
                       display: 'flex',
                       flexDirection: 'column',
-                      cursor: 'pointer',
-                      transition: 'all 0.25s cubic-bezier(0.2, 0, 0, 1)',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.borderColor = '#c0c0c0';
-                      (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)';
-                      (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 28px rgba(0,0,0,0.6)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a';
-                      (e.currentTarget as HTMLElement).style.transform = 'none';
-                      (e.currentTarget as HTMLElement).style.boxShadow = 'none';
                     }}
                   >
+
                     <div style={{ height: '170px', background: '#161616', position: 'relative', overflow: 'hidden' }}>
                       {cover ? (
                         <img
@@ -316,23 +304,9 @@ export default function LandingPage() {
                         }}>
                           {game.description}
                         </p>
-                      )}
-                      <div style={{
-                        marginTop: 'auto',
-                        paddingTop: '10px',
-                        borderTop: '1px solid #1c1c1c',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: '#c0c0c0',
-                      }}>
-                        <span>Play This Title</span>
-                        <span style={{ fontSize: '0.85rem' }}>→</span>
-                      </div>
                     </div>
-                  </Link>
+                  </div>
+
                 );
               })}
             </div>
