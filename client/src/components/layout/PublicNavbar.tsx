@@ -152,31 +152,6 @@ export function PublicNavbar() {
             {!isMobile ? (
               <>
                 <Link
-                  to="/admin/dashboard"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: '38px',
-                    padding: '0 16px',
-                    backgroundColor: '#161616',
-                    color: '#c0c0c0',
-                    border: '1px solid #2a2a2a',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    textDecoration: 'none',
-                    borderRadius: '6px',
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={e => { (e.target as HTMLElement).style.borderColor = '#c0c0c0'; (e.target as HTMLElement).style.color = '#ffffff'; }}
-                  onMouseLeave={e => { (e.target as HTMLElement).style.borderColor = '#2a2a2a'; (e.target as HTMLElement).style.color = '#c0c0c0'; }}
-                >
-                  Admin Portal
-                </Link>
-
-                <Link
                   to="/book"
                   style={{
                     display: 'inline-flex',
@@ -341,26 +316,6 @@ export function PublicNavbar() {
                 }}
               >
                 Book a Session
-              </Link>
-              <Link
-                to="/admin/dashboard"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '42px',
-                  backgroundColor: '#161616',
-                  color: '#8b8b8b',
-                  border: '1px solid #2a2a2a',
-                  fontSize: '0.78rem',
-                  fontWeight: '700',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  textDecoration: 'none',
-                  borderRadius: '6px',
-                }}
-              >
-                Admin Portal
               </Link>
             </div>
           </div>
