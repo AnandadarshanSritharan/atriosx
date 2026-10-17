@@ -5,6 +5,37 @@ import BusinessSettings from '../models/BusinessSettings';
 import Holiday from '../models/Holiday';
 import { format, parse, isAfter, isBefore, addMinutes } from 'date-fns';
 
+// Helper: Get current local time and date in Asia/Colombo (Sri Lanka UTC+5:30)
+export function getColomboNow(timezone = 'Asia/Colombo') {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(new Date());
+    const m: Record<string, string> = {};
+    parts.forEach(p => { m[p.type] = p.value; });
+    let hour = parseInt(m.hour || '0', 10);
+    if (hour === 24) hour = 0;
+    const minute = parseInt(m.minute || '0', 10);
+    const dateStr = `${m.year}-${m.month}-${m.day}`;
+    return { dateStr, hour, minute, minutes: hour * 60 + minute };
+  } catch {
+    const colomboMs = Date.now() + (5 * 60 + 30) * 60 * 1000;
+    const d = new Date(colomboMs);
+    const dateStr = d.toISOString().split('T')[0];
+    const hour = d.getUTCHours();
+    const minute = d.getUTCMinutes();
+    return { dateStr, hour, minute, minutes: hour * 60 + minute };
+  }
+}
+
 interface AvailabilityParams {
   facilityId: string;
   date: string; // YYYY-MM-DD
@@ -119,11 +150,16 @@ export const bookingService = {
       closeMinutes += 24 * 60;
     }
 
-    // Check if checking for today so past slots aren't offered
-    const now = new Date();
-    const todayStr = format(now, 'yyyy-MM-dd');
-    const isToday = date === todayStr;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    // Check if checking for today so past slots aren't offered (using Asia/Colombo local time)
+    const colomboNow = getColomboNow();
+    const isToday = date === colomboNow.dateStr;
+    const isPastDate = date < colomboNow.dateStr;
+
+    if (isPastDate) {
+      return { available: false, slots: [], reason: 'Selected date is in the past' };
+    }
+
+    const nowMinutes = colomboNow.minutes;
     
     // Get all existing bookings for this facility on this date
     const existingBookings = await Booking.find({

@@ -1,6 +1,6 @@
 import express from 'express';
 import { authenticate, authorize } from '../middleware/auth';
-import { bookingService } from '../services/bookingService';
+import { bookingService, getColomboNow } from '../services/bookingService';
 import Booking from '../models/Booking';
 import Facility from '../models/Facility';
 import { createAuditLog } from '../middleware/auditLogger';
@@ -111,8 +111,11 @@ router.post('/', async (req: any, res) => {
     const customStatus = req.body.status;
     let facilityId = req.body.facilityId;
 
-    // Normalizing date: if empty or missing, default to today
-    const date = rawDate || format(new Date(), 'yyyy-MM-dd');
+    // Colombo local time
+    const colomboNow = getColomboNow();
+
+    // Normalizing date: if empty or missing, default to today in Colombo time
+    const date = rawDate || colomboNow.dateStr;
 
     // Normalizing startTime (supports formats like "8.27", "8:27", "08:27", etc.)
     let startTime = '09:00';
@@ -127,13 +130,27 @@ router.post('/', async (req: any, res) => {
         startTime = `${String(h).padStart(2, '0')}:00`;
       }
     } else {
-      const now = new Date();
-      startTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      startTime = `${String(colomboNow.hour).padStart(2, '0')}:${String(colomboNow.minute).padStart(2, '0')}`;
     }
 
     // Public website bookings require customer name & phone if not admin/walk_in
     if (!req.user && req.body.source !== 'admin' && req.body.source !== 'walk_in' && (!customerName || !customerPhone)) {
       return res.status(400).json({ success: false, message: 'Customer name and phone number are required' });
+    }
+
+    // Public website bookings cannot book slots that have already passed in Colombo time
+    if (!req.user && req.body.source !== 'admin' && req.body.source !== 'walk_in') {
+      const isPastDate = date < colomboNow.dateStr;
+      const [sH, sM] = startTime.split(':').map(Number);
+      const startMins = sH * 60 + sM;
+      const isPastTime = date === colomboNow.dateStr && startMins < colomboNow.minutes;
+
+      if (isPastDate || isPastTime) {
+        return res.status(400).json({
+          success: false,
+          message: 'The selected time has already passed. Please choose an upcoming time slot.',
+        });
+      }
     }
 
     // Default to first active facility if neither facilityId nor categoryId is provided

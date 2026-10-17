@@ -643,7 +643,22 @@ export default function BookingWizard() {
               ) : !availData?.slots?.length ? (
                 <p style={{ color: '#6b6b6b', fontSize: '0.85rem' }}>No time slots available for this date. Please try another day.</p>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '10px' }}>
+                <>
+                  {availData.slots.every((s: any) => !s.available) && (
+                    <div style={{
+                      background: '#b3393918',
+                      border: '1px solid #b3393950',
+                      borderRadius: '8px',
+                      padding: '12px 16px',
+                      marginBottom: '16px',
+                      color: '#ff8585',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                    }}>
+                      All session slots for this date have already passed or are fully booked. Please go back to Step 2 and choose an upcoming date.
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '10px' }}>
                   {availData.slots.map((slot: any, i: number) => (
                     <button key={i} disabled={!slot.available} onClick={() => setData({ ...data, startTime: slot.time })}
                       style={{
@@ -656,7 +671,8 @@ export default function BookingWizard() {
                       {slot.time}
                     </button>
                   ))}
-                </div>
+                  </div>
+                </>
               )}
             </div>
 
