@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { gamesApi } from '@/api/games';
 import { facilitiesApi } from '@/api/facilities';
-import { Search, Sparkles, Gamepad2, ArrowRight } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 import type { FacilityCategory, Game } from '@/types';
+
 
 const SLUG_TO_EMOJI: Record<string, string> = {
   'playstation': '🎮', 'playstation-5': '🎮', 'ps5': '🎮',
@@ -424,30 +424,7 @@ function GameCard({ game }: { game: any }) {
           </p>
         )}
 
-        {/* Book Button */}
-        <Link
-          to={catId ? `/book?category=${catId}` : '/book'}
-          style={{
-            marginTop: 'auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '11px 16px',
-            background: hovered ? '#c0c0c0' : '#1a1a1a',
-            border: `1px solid ${hovered ? '#c0c0c0' : '#2e2e2e'}`,
-            borderRadius: '8px',
-            color: hovered ? '#000000' : '#c0c0c0',
-            fontWeight: 700,
-            fontSize: '0.82rem',
-            textDecoration: 'none',
-            letterSpacing: '0.04em',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <span>Book Session</span>
-          <ArrowRight size={14} />
-        </Link>
+
       </div>
     </div>
   );

@@ -5,7 +5,8 @@ import { facilitiesApi } from '@/api/facilities';
 import { gamesApi } from '@/api/games';
 import { useAvailabilityByCategory, useCreateBooking } from '@/hooks/useBookings';
 import BookingConfirmation from './BookingConfirmation';
-import { Users, Gamepad2, Check, Sparkles } from 'lucide-react';
+import { Users, Gamepad2 } from 'lucide-react';
+
 
 const STEPS = ['Experience', 'Date', 'Time & Players', 'Details', 'Confirm'];
 
@@ -58,15 +59,7 @@ function getCategoryIcon(slug: string): string {
   return SLUG_TO_EMOJI[slug?.toLowerCase()] || '🎯';
 }
 
-function GameIconTile({
-  game,
-  isSelected,
-  onToggle,
-}: {
-  game: any;
-  isSelected: boolean;
-  onToggle: () => void;
-}) {
+function GameIconTile({ game }: { game: any }) {
   const [hovered, setHovered] = useState(false);
   const gameTitle = game.title || game.name;
   const cover = game.coverImage || game.imageUrl || game.image;
@@ -78,68 +71,29 @@ function GameIconTile({
       onMouseLeave={() => setHovered(false)}
     >
       <div
-        onClick={onToggle}
         style={{
           width: '54px',
           height: '54px',
           borderRadius: '10px',
-          border: isSelected
-            ? '2px solid #ffffff'
-            : hovered
-            ? '2px solid #c0c0c0'
-            : '1px solid #2a2a2a',
+          border: hovered ? '1px solid #c0c0c0' : '1px solid #2a2a2a',
           background: '#161616',
           overflow: 'hidden',
-          cursor: 'pointer',
-          transform: hovered ? 'scale(1.18) translateY(-2px)' : 'scale(1)',
-          boxShadow: isSelected
-            ? '0 0 12px rgba(255,255,255,0.35)'
-            : hovered
-            ? '0 8px 20px rgba(0,0,0,0.7)'
-            : 'none',
+          cursor: 'default',
+          transform: hovered ? 'scale(1.12) translateY(-2px)' : 'scale(1)',
+          boxShadow: hovered ? '0 8px 20px rgba(0,0,0,0.7)' : 'none',
           transition: 'all 0.18s cubic-bezier(0.2, 0, 0, 1)',
-          position: 'relative',
         }}
       >
         {cover ? (
-          <img
-            src={cover}
-            alt={gameTitle}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
+          <img src={cover} alt={gameTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
             🎮
           </div>
         )}
-
-        {/* Selected checkmark indicator */}
-        {isSelected && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <div style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '50%',
-              background: '#ffffff',
-              color: '#000000',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Check size={13} strokeWidth={3.5} />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Hover popover with title and genre */}
+      {/* Hover tooltip with title */}
       {hovered && (
         <div style={{
           position: 'absolute',
@@ -159,31 +113,21 @@ function GameIconTile({
           alignItems: 'center',
           gap: '2px',
         }}>
-          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff' }}>
-            {gameTitle}
-          </span>
+          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#ffffff' }}>{gameTitle}</span>
           {game.category && (
-            <span style={{ fontSize: '0.65rem', color: '#c0c0c0', fontWeight: 600 }}>
-              {game.category}
-            </span>
+            <span style={{ fontSize: '0.65rem', color: '#c0c0c0', fontWeight: 600 }}>{game.category}</span>
           )}
-          {/* Arrow */}
           <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 0,
-            height: 0,
-            borderLeft: '5px solid transparent',
-            borderRight: '5px solid transparent',
-            borderTop: '5px solid #3a3a3a',
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid #3a3a3a',
           }} />
         </div>
       )}
     </div>
   );
 }
+
 
 export default function BookingWizard() {
   const [searchParams] = useSearchParams();
@@ -536,22 +480,16 @@ export default function BookingWizard() {
               </div>
             )}
 
-            {/* INCLUDED GAMES IN THIS CATEGORY - ICON ONLY WITH HOVER ZOOM & TITLE */}
+            {/* INCLUDED GAMES IN THIS CATEGORY — DISPLAY ONLY */}
             {categoryGames.length > 0 && (
               <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid #1f1f1f' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Gamepad2 size={16} style={{ color: '#c0c0c0' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      Games Available on {data.categoryName || 'this setup'}
-                    </span>
-                  </div>
-                  <span style={{ fontSize: '0.72rem', color: '#8b8b8b' }}>
-                    {data.preferredGame ? (
-                      <span style={{ color: '#c0c0c0', fontWeight: 600 }}>Selected: {data.preferredGame}</span>
-                    ) : (
-                      'Hover for title · Click to select'
-                    )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                  <Gamepad2 size={16} style={{ color: '#c0c0c0' }} />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Games Available on {data.categoryName || 'this setup'}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#6b6b6b', marginLeft: '4px' }}>
+                    · Hover to see titles
                   </span>
                 </div>
 
@@ -562,21 +500,16 @@ export default function BookingWizard() {
                   alignItems: 'center',
                   padding: '8px 2px',
                 }}>
-                  {categoryGames.map((game: any) => {
-                    const gameTitle = game.title || game.name;
-                    const isSelected = data.preferredGame === gameTitle;
-                    return (
-                      <GameIconTile
-                        key={game._id || game.id}
-                        game={game}
-                        isSelected={isSelected}
-                        onToggle={() => setData({ ...data, preferredGame: isSelected ? undefined : gameTitle })}
-                      />
-                    );
-                  })}
+                  {categoryGames.map((game: any) => (
+                    <GameIconTile
+                      key={game._id || game.id}
+                      game={game}
+                    />
+                  ))}
                 </div>
               </div>
             )}
+
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
               <button onClick={handleBack} style={BTN_SECONDARY}>Back</button>
@@ -596,23 +529,8 @@ export default function BookingWizard() {
               Configure your group size and session time. Rates update dynamically.
             </p>
 
-            {data.preferredGame && (
-              <div style={{
-                marginBottom: '20px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: '#c0c0c010',
-                border: '1px solid #c0c0c030',
-                borderRadius: '8px',
-                padding: '8px 14px',
-              }}>
-                <Gamepad2 size={15} style={{ color: '#c0c0c0' }} />
-                <span style={{ fontSize: '0.8rem', color: '#c0c0c0' }}>
-                  Selected Game: <strong style={{ color: '#ffffff' }}>{data.preferredGame}</strong>
-                </span>
-              </div>
-            )}
+
+
 
             {/* PERSON / PLAYER COUNT SELECTOR */}
             {data.pricingTiers && data.pricingTiers.length > 0 && (
@@ -786,8 +704,8 @@ export default function BookingWizard() {
             <div style={{ background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px', marginBottom: '20px' }}>
               {[
                 { label: 'Experience', value: data.categoryName },
-                ...(data.preferredGame ? [{ label: 'Preferred Game', value: `🎮 ${data.preferredGame}` }] : []),
                 { label: 'Group Size', value: `${data.personCount || 1} ${Number(data.personCount || 1) > 1 ? 'Persons' : 'Person'}` },
+
                 { label: 'Rate Applied', value: `Rs. ${activeHourlyRate.toLocaleString()}/hr` },
                 { label: 'Date', value: data.date ? new Date(data.date + 'T00:00:00').toLocaleDateString('en-LK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '' },
                 { label: 'Time', value: data.startTime },
