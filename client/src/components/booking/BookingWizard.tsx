@@ -643,7 +643,7 @@ export default function BookingWizard() {
               ) : !availData?.slots?.length ? (
                 <p style={{ color: '#6b6b6b', fontSize: '0.85rem' }}>No time slots available for this date. Please try another day.</p>
               ) : (
-                {(() => {
+                (() => {
                   // Compute close boundary from availData
                   const [ch, cm] = (availData?.closeTime || '23:59').split(':').map(Number);
                   const closeMinutes = ch * 60 + cm;
@@ -691,7 +691,7 @@ export default function BookingWizard() {
                       </div>
                     </>
                   );
-                })()}
+                })()
               )}
             </div>
 

@@ -25,7 +25,7 @@ export const bookingsApi = {
       ('/bookings/availability', { params: { facilityId, date } }),
   // Availability by categoryId — merges slots across all units in the category
   getAvailabilityByCategory: (categoryId: string, date: string) =>
-    api.get<ApiResponse<{ slots: (AvailabilitySlot & { freeUnits: number })[]; minDuration: number; maxDuration: number; interval: number; totalUnits: number }>>
+    api.get<ApiResponse<{ slots: (AvailabilitySlot & { freeUnits: number })[]; minDuration: number; maxDuration: number; interval: number; totalUnits: number; openTime: string; closeTime: string }>>
       ('/bookings/availability-by-category', { params: { categoryId, date } }),
   exportExcel: (params?: BookingFilters) =>
     api.get('/bookings/export/excel', { params, responseType: 'blob' }),
