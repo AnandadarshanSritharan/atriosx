@@ -1,0 +1,221 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { bookingsApi } from '@/api/bookings';
+import { facilitiesApi } from '@/api/facilities';
+import { Search, Download, Calendar, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { format } from 'date-fns';
+
+const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  confirmed:  { bg: '#3d85c815', text: '#3d85c8', border: '#3d85c840' },
+  pending:    { bg: '#d4a01715', text: '#d4a017', border: '#d4a01740' },
+  completed:  { bg: '#2d7a4f15', text: '#2d7a4f', border: '#2d7a4f40' },
+  cancelled:  { bg: '#5a5a5a15', text: '#5a5a5a', border: '#5a5a5a40' },
+  no_show:    { bg: '#8b202015', text: '#8b2020', border: '#8b202040' },
+  'no-show':  { bg: '#8b202015', text: '#8b2020', border: '#8b202040' },
+};
+
+export default function BookingListPage() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [facilityId, setFacilityId] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
+
+  const { data: facilitiesData } = useQuery({
+    queryKey: ['facilities-select'],
+    queryFn: () => facilitiesApi.getAll().then(r => r.data.data),
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['bookings', { search, status, facilityId, dateFrom, dateTo, page }],
+    queryFn: () => bookingsApi.getAll({
+      search: search || undefined,
+      status: status || undefined,
+      facilityId: facilityId || undefined,
+      facility: facilityId || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      page,
+      limit: PAGE_SIZE,
+    }).then(r => r.data),
+    placeholderData: (prev) => prev,
+  });
+
+  const { mutate: updateStatus } = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => bookingsApi.updateStatus(id, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bookings'] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+    },
+  });
+
+  const bookings = data?.data || [];
+  const total = data?.pagination?.total || data?.total || bookings.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const handleExport = async () => {
+    try {
+      const res = await bookingsApi.exportExcel({ search, status, facilityId, dateFrom, dateTo });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Bookings-${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) { console.error('Export failed', e); }
+  };
+
+  const SC = (s: string) => STATUS_COLORS[s] || { bg: '#2a2a2a', text: '#6b6b6b', border: '#2a2a2a' };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ffffff', marginBottom: '4px', letterSpacing: '-0.02em' }}>Bookings</h1>
+          <p style={{ color: '#6b6b6b', fontSize: '0.85rem' }}>{total} total booking{total !== 1 ? 's' : ''}</p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => navigate('/admin/bookings/calendar')} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#111111', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#c0c0c0', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+            <Calendar size={15} /> Calendar View
+          </button>
+          <button onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: '#111111', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#c0c0c0', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+            <Download size={15} /> Export Excel
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1 1 200px' }}>
+          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b6b6b' }} />
+          <input
+            placeholder="Search customer, phone, booking#..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{ width: '100%', paddingLeft: '34px', padding: '9px 12px 9px 34px', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '7px', color: '#ffffff', fontSize: '0.82rem', outline: 'none' }}
+          />
+        </div>
+        <select value={status} onChange={e => { setStatus(e.target.value); setPage(1); }}
+          style={{ padding: '9px 12px', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '7px', color: status ? '#ffffff' : '#6b6b6b', fontSize: '0.82rem', outline: 'none', cursor: 'pointer' }}>
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Ongoing</option>
+          <option value="completed">Completed</option>
+          <option value="no_show">No Show</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select value={facilityId} onChange={e => { setFacilityId(e.target.value); setPage(1); }}
+          style={{ padding: '9px 12px', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '7px', color: facilityId ? '#ffffff' : '#6b6b6b', fontSize: '0.82rem', outline: 'none', cursor: 'pointer' }}>
+          <option value="">All Facilities</option>
+          {facilitiesData?.map((f: any) => <option key={f._id} value={f._id}>{f.name}</option>)}
+        </select>
+        <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+          style={{ padding: '9px 12px', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '7px', color: dateFrom ? '#ffffff' : '#6b6b6b', fontSize: '0.82rem', outline: 'none', colorScheme: 'dark' }} />
+        <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
+          style={{ padding: '9px 12px', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '7px', color: dateTo ? '#ffffff' : '#6b6b6b', fontSize: '0.82rem', outline: 'none', colorScheme: 'dark' }} />
+        {(search || status || facilityId || dateFrom || dateTo) && (
+          <button onClick={() => { setSearch(''); setStatus(''); setFacilityId(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+            style={{ padding: '9px 14px', background: 'transparent', border: '1px solid #3a3a3a', borderRadius: '7px', color: '#8b8b8b', fontSize: '0.8rem', cursor: 'pointer' }}>
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #1f1f1f' }}>
+                {['Booking #', 'Customer', 'Phone', 'Facility', 'Date', 'Time', 'Duration', 'Amount', 'Status', 'Source', ''].map(h => (
+                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', color: '#4b4b4b', fontWeight: 600, fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap', background: '#0d0d0d' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i}><td colSpan={11} style={{ padding: '12px 16px' }}><div style={{ height: '20px', background: '#1a1a1a', borderRadius: '4px', animation: 'pulse 1.5s infinite' }} /></td></tr>
+                ))
+              ) : bookings.length === 0 ? (
+                <tr><td colSpan={11} style={{ padding: '60px', textAlign: 'center', color: '#4b4b4b' }}>No bookings found</td></tr>
+              ) : bookings.map((b: any) => {
+                const c = SC(b.status);
+                const durationVal = b.durationMinutes ?? b.duration ?? 60;
+                const totalVal = b.total ?? b.totalAmount ?? 0;
+                const sourceVal = b.bookingSource || b.source || 'website';
+                return (
+                  <tr key={b._id} onClick={() => navigate(`/admin/bookings/${b._id}`)}
+                    style={{ cursor: 'pointer', borderBottom: '1px solid #141414', transition: 'background 0.1s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#161616'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                    <td style={{ padding: '12px 16px', color: '#c0c0c0', fontWeight: 700, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{b.bookingNumber}</td>
+                    <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 600, whiteSpace: 'nowrap' }}>{b.customer?.name || b.name}</td>
+                    <td style={{ padding: '12px 16px', color: '#8b8b8b', whiteSpace: 'nowrap' }}>{b.customer?.phone || b.phone}</td>
+                    <td style={{ padding: '12px 16px', color: '#8b8b8b', whiteSpace: 'nowrap' }}>{b.facility?.name || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: '#8b8b8b', whiteSpace: 'nowrap' }}>{b.date}</td>
+                    <td style={{ padding: '12px 16px', color: '#8b8b8b', whiteSpace: 'nowrap' }}>{b.startTime}–{b.endTime}</td>
+                    <td style={{ padding: '12px 16px', color: '#8b8b8b', whiteSpace: 'nowrap' }}>{durationVal} min</td>
+                    <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 700, whiteSpace: 'nowrap' }}>Rs. {Number(totalVal).toLocaleString()}</td>
+                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                      <select
+                        value={b.status === 'no-show' ? 'no_show' : b.status}
+                        onChange={e => updateStatus({ id: b._id, status: e.target.value })}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          background: c.bg,
+                          color: c.text,
+                          border: `1px solid ${c.border}`,
+                          outline: 'none',
+                          cursor: 'pointer',
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        <option value="pending" style={{ background: '#111111', color: '#ffffff' }}>Pending</option>
+                        <option value="confirmed" style={{ background: '#111111', color: '#ffffff' }}>Ongoing</option>
+                        <option value="completed" style={{ background: '#111111', color: '#ffffff' }}>Completed</option>
+                        <option value="no_show" style={{ background: '#111111', color: '#ffffff' }}>No Show</option>
+                        <option value="cancelled" style={{ background: '#111111', color: '#ffffff' }}>Cancelled</option>
+                      </select>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#6b6b6b', fontSize: '0.72rem', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{sourceVal}</td>
+                    <td style={{ padding: '12px 16px' }}><Eye size={14} color="#4b4b4b" /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderTop: '1px solid #1f1f1f' }}>
+            <span style={{ fontSize: '0.8rem', color: '#6b6b6b' }}>
+              Showing {((page-1)*PAGE_SIZE)+1}–{Math.min(page*PAGE_SIZE, total)} of {total}
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}
+                style={{ padding: '6px 12px', background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#c0c0c0', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.4 : 1 }}>
+                <ChevronLeft size={14} />
+              </button>
+              <span style={{ padding: '6px 12px', fontSize: '0.8rem', color: '#ffffff' }}>{page} / {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}
+                style={{ padding: '6px 12px', background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#c0c0c0', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.4 : 1 }}>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
