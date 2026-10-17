@@ -242,6 +242,38 @@ router.post('/', async (req: any, res) => {
   }
 });
 
+// Admin: get latest booking for notification polling
+router.get('/latest', authenticate, async (req, res) => {
+  try {
+    const booking = await Booking.findOne({ archived: false })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .populate('facility', 'name')
+      .populate('customer', 'name phone');
+
+    if (!booking) return res.json({ success: true, data: null });
+
+    const cust = booking.customer as any;
+    const fac = booking.facility as any;
+    const custName = cust?.name && !cust.name.startsWith('walkin-') ? cust.name : (cust?.phone || 'Walk-in Guest');
+
+    res.json({
+      success: true,
+      data: {
+        _id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        customerName: custName,
+        facilityName: fac?.name || 'Station',
+        date: booking.date,
+        startTime: booking.startTime,
+        createdAt: (booking as any).createdAt,
+      },
+    });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
 // Admin: get calendar events (FullCalendar format)
 router.get('/calendar', authenticate, async (req, res) => {
   try {

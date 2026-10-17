@@ -29,4 +29,6 @@ export const bookingsApi = {
       ('/bookings/availability-by-category', { params: { categoryId, date } }),
   exportExcel: (params?: BookingFilters) =>
     api.get('/bookings/export/excel', { params, responseType: 'blob' }),
+  // Notification polling — returns the single most recent booking (admin only)
+  getLatestBooking: () => api.get<ApiResponse<any>>('/bookings/latest'),
 };

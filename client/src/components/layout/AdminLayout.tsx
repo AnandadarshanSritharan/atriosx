@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AdminSidebar } from './AdminSidebar';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BookingNotificationProvider } from '@/components/shared/BookingNotification';
 
 export function AdminLayout() {
   const { isAuthenticated, loading, logout } = useAuth();
@@ -12,6 +13,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen flex bg-background text-white">
+      <BookingNotificationProvider />
       <AdminSidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border bg-surface/50 backdrop-blur-sm flex items-center justify-between px-8">
