@@ -11,6 +11,6 @@
     "resolveJsonModule": true,
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src/**/*", "scripts/**/*"],
+  "include": ["src/**/*", "scripts/**/*", "api/**/*"],
   "exclude": ["node_modules", "dist"]
 }
