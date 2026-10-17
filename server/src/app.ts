@@ -108,7 +108,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Resilient DB connection: tries MONGODB_URI first, falls back to embedded in-memory MongoDB
-export const connectDB = async () => {
+const connectDB = async () => {
   const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/atrios';
   try {
     // Attempt standard connection with 10s timeout
@@ -152,9 +152,14 @@ export const connectDB = async () => {
   }
 };
 
+// Initiate DB connection
+connectDB().catch(err => {
+  console.error('Initial DB connection error:', err);
+});
+
 const PORT = process.env.PORT || 5000;
 
-export const startServer = async () => {
+const startServer = async () => {
   await connectDB();
   return app.listen(PORT, () => {
     console.log(`🚀 Atrios Entertainment server running on http://localhost:${PORT}`);
@@ -164,5 +169,8 @@ export const startServer = async () => {
 if (require.main === module) {
   startServer();
 }
+
+(app as any).connectDB = connectDB;
+(app as any).startServer = startServer;
 
 export default app;
