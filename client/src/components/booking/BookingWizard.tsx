@@ -59,6 +59,15 @@ function getCategoryIcon(slug: string): string {
   return SLUG_TO_EMOJI[slug?.toLowerCase()] || '🎯';
 }
 
+function formatDurationLabel(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m} Mins`;
+  if (m === 0) return `${h} ${h === 1 ? 'Hour' : 'Hours'}`;
+  if (m === 30) return `${h}.5 Hours`;
+  return `${h}h ${m}m`;
+}
+
 function GameIconTile({ game }: { game: any }) {
   const [hovered, setHovered] = useState(false);
   const gameTitle = game.title || game.name;
@@ -582,18 +591,37 @@ export default function BookingWizard() {
 
             {/* Duration selector */}
             <div style={{ marginBottom: '24px' }}>
-              <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px', display: 'block' }}>Session Duration</label>
+              <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px', display: 'block' }}>
+                Session Duration
+              </label>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 {(() => {
-                  const min = availData?.minDuration || 30;
-                  const max = availData?.maxDuration || 180;
-                  const interval = availData?.interval || 30;
+                  const min = Math.max(30, availData?.minDuration || 30);
+                  const max = Math.max(min, availData?.maxDuration || 240);
+                  // Clean standard 30-minute intervals (30 Mins, 1 Hour, 1.5 Hours, 2 Hours, etc.)
                   const opts: number[] = [];
-                  for (let d = min; d <= max; d += interval) opts.push(d);
-                  return (opts.length ? opts : [30, 60, 90, 120]).map((d: number) => (
-                    <button key={d} onClick={() => setData({ ...data, duration: d })}
-                      style={{ padding: '9px 18px', background: data.duration === d ? '#c0c0c0' : '#161616', border: `1px solid ${data.duration === d ? '#c0c0c0' : '#2a2a2a'}`, borderRadius: '8px', color: data.duration === d ? '#000' : '#8b8b8b', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}>
-                      {d >= 60 ? `${d / 60}h${d % 60 ? ` ${d % 60}m` : ''}` : `${d}m`}
+                  for (let d = min; d <= max; d += 30) {
+                    opts.push(d);
+                  }
+                  const finalOpts = opts.length ? opts : [30, 60, 90, 120, 180, 240];
+                  return finalOpts.map((d: number) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setData({ ...data, duration: d })}
+                      style={{
+                        padding: '10px 18px',
+                        background: data.duration === d ? '#c0c0c0' : '#161616',
+                        border: `1px solid ${data.duration === d ? '#c0c0c0' : '#2a2a2a'}`,
+                        borderRadius: '8px',
+                        color: data.duration === d ? '#000000' : '#c0c0c0',
+                        fontWeight: 700,
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {formatDurationLabel(d)}
                     </button>
                   ));
                 })()}
@@ -644,7 +672,7 @@ export default function BookingWizard() {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ color: '#6b6b6b', fontSize: '0.75rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Total for {data.duration || 60} mins
+                  Total for {formatDurationLabel(data.duration || 60)}
                 </span>
                 <span style={{ color: '#ffffff', fontWeight: 900, fontSize: '1.2rem' }}>
                   Rs. {estimatedTotal.toLocaleString()}
@@ -709,7 +737,7 @@ export default function BookingWizard() {
                 { label: 'Rate Applied', value: `Rs. ${activeHourlyRate.toLocaleString()}/hr` },
                 { label: 'Date', value: data.date ? new Date(data.date + 'T00:00:00').toLocaleDateString('en-LK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '' },
                 { label: 'Time', value: data.startTime },
-                { label: 'Duration', value: `${data.duration} minutes` },
+                { label: 'Duration', value: formatDurationLabel(data.duration || 60) },
                 { label: 'Name', value: data.name },
                 { label: 'Phone', value: data.phone },
                 { label: 'Estimated Total', value: `Rs. ${estimatedTotal.toLocaleString()}` },
