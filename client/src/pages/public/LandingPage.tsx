@@ -304,6 +304,7 @@ export default function LandingPage() {
                         }}>
                           {game.description}
                         </p>
+                      )}
                     </div>
                   </div>
 
