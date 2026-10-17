@@ -1,7 +1,4 @@
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import crypto from 'crypto';
 import { v2 as cloudinary } from 'cloudinary';
 
 // Configure Cloudinary
@@ -20,45 +17,40 @@ if (isCloudinaryConfigured) {
   });
 }
 
-// Storage setup: Cloudinary if credentials present, fallback to local disk
+// Storage setup: Cloudinary if credentials present, fallback to memory storage for serverless safety
 let storage: multer.StorageEngine;
 
 if (isCloudinaryConfigured) {
-  const { CloudinaryStorage } = require('multer-storage-cloudinary');
-  storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: async (req: any, file: any) => {
-      const field = file.fieldname || 'general';
-      return {
-        folder: `atrios/${field}`,
-        allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif'],
-        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
-      };
-    },
-  });
+  try {
+    const { CloudinaryStorage } = require('multer-storage-cloudinary');
+    storage = new CloudinaryStorage({
+      cloudinary: cloudinary,
+      params: async (req: any, file: any) => {
+        const field = file.fieldname || 'general';
+        return {
+          folder: `atrios/${field}`,
+          allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'avif'],
+          transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+        };
+      },
+    });
+  } catch (storageErr) {
+    console.warn('Could not initialize CloudinaryStorage, falling back to memory storage:', storageErr);
+    storage = multer.memoryStorage();
+  }
 } else {
-  const uploadDir = process.env.UPLOAD_DIR || 'uploads';
-  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-  storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(uploadDir, file.fieldname || 'general');
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, `${crypto.randomUUID()}${ext}`);
-    },
-  });
+  // In serverless (Vercel), disk is read-only. Memory storage keeps buffers safely in RAM.
+  storage = multer.memoryStorage();
 }
 
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowed = /jpeg|jpg|png|gif|webp|svg|avif/;
-  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
   const mime = allowed.test(file.mimetype);
-  if (ext || mime) cb(null, true);
-  else cb(new Error('Only image files are allowed'));
+  if (mime) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed'));
+  }
 };
 
 export const upload = multer({
@@ -68,7 +60,6 @@ export const upload = multer({
 });
 
 export const getFileUrl = (req: any, filename?: string, fieldname: string = 'general'): string => {
-  // If uploaded to Cloudinary, req.file.path or req.file.secure_url is the full CDN URL
   if (req.file?.path && typeof req.file.path === 'string' && req.file.path.startsWith('http')) {
     return req.file.path;
   }

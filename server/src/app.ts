@@ -114,7 +114,7 @@ const connectDB = async () => {
 };
 
 // Health check endpoint (independent of DB to always diagnose state)
-app.get('/api/health', async (req, res) => {
+const healthHandler = async (req: express.Request, res: express.Response) => {
   let dbStatus = 'disconnected';
   let dbError: string | null = null;
 
@@ -133,6 +133,8 @@ app.get('/api/health', async (req, res) => {
     success: true,
     brand: 'Atrios Entertainment',
     message: 'Atrios API is running',
+    requestPath: req.path,
+    requestOriginalUrl: req.originalUrl,
     database: {
       status: dbStatus,
       readyState: mongoose.connection.readyState,
@@ -147,11 +149,14 @@ app.get('/api/health', async (req, res) => {
     },
     timestamp: new Date(),
   });
-});
+};
+
+app.get('/api/health', healthHandler);
+app.get('/health', healthHandler);
 
 // Middleware to ensure DB is connected before handling any data routes
 app.use(async (req, res, next) => {
-  if (req.path === '/api/health') {
+  if (req.path === '/api/health' || req.path === '/health') {
     return next();
   }
 
@@ -171,22 +176,29 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/facilities', facilityRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/offers', offerRoutes);
-app.use('/api/news', newsRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/partners', partnerRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/gallery', galleryRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/audit-logs', auditLogRoutes);
-app.use('/api/upload', uploadRoutes);
+// Routes (supporting both /api/path and /path)
+const routes = [
+  { path: 'auth', router: authRoutes },
+  { path: 'bookings', router: bookingRoutes },
+  { path: 'facilities', router: facilityRoutes },
+  { path: 'customers', router: customerRoutes },
+  { path: 'games', router: gameRoutes },
+  { path: 'offers', router: offerRoutes },
+  { path: 'news', router: newsRoutes },
+  { path: 'expenses', router: expenseRoutes },
+  { path: 'partners', router: partnerRoutes },
+  { path: 'reports', router: reportRoutes },
+  { path: 'gallery', router: galleryRoutes },
+  { path: 'settings', router: settingsRoutes },
+  { path: 'users', router: userRoutes },
+  { path: 'audit-logs', router: auditLogRoutes },
+  { path: 'upload', router: uploadRoutes },
+];
+
+routes.forEach(({ path: routePath, router }) => {
+  app.use(`/api/${routePath}`, router);
+  app.use(`/${routePath}`, router);
+});
 
 // 404 handler
 app.use((req, res) => {
