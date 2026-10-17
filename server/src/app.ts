@@ -30,7 +30,20 @@ const app = express();
 // Security middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // In production allow same-domain and Vercel preview/prod URLs
+    const allowed = [
+      process.env.CLIENT_URL,
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ].filter(Boolean);
+    // Allow Vercel domains and same-origin (no origin header)
+    if (!origin || allowed.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // permissive for now — restrict after live testing
+    }
+  },
   credentials: true,
 }));
 
@@ -108,7 +121,7 @@ export const connectDB = async () => {
       const User = require('./models/User').default;
       const adminExists = await User.findOne({ email: 'admin@atrios.lk' });
       if (!adminExists) {
-        console.log('🌱 First time Atlas setup: Seeding initial database records...');
+        console.log('🌱 First time setup: Seeding initial database records...');
         const { seedDatabase } = require('../scripts/seed');
         await seedDatabase();
       }
@@ -117,6 +130,11 @@ export const connectDB = async () => {
     }
   } catch (err: any) {
     console.log('⚠️ Could not connect to primary MONGODB_URI. Error:', err.message);
+    // In production (Vercel), cannot run mongodb-memory-server — fail loudly
+    if (process.env.NODE_ENV === 'production') {
+      console.error('❌ Production: MongoDB Atlas connection failed. Check MONGODB_URI env var.');
+      throw err;
+    }
     console.log('Starting embedded in-memory MongoDB server as fallback...');
     try {
       const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -124,7 +142,6 @@ export const connectDB = async () => {
       const memUri = mongod.getUri();
       await mongoose.connect(memUri);
       console.log('✅ Connected to Embedded In-Memory MongoDB at:', memUri);
-
       // Auto-seed in-memory DB so it is ready immediately
       const { seedDatabase } = require('../scripts/seed');
       await seedDatabase();
