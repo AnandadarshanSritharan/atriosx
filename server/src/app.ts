@@ -27,21 +27,23 @@ import uploadRoutes from './routes/upload';
 
 const app = express();
 
+// Trust reverse proxy (Vercel, Render, Railway, etc.)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
   origin: (origin, callback) => {
-    // In production allow same-domain and Vercel preview/prod URLs
     const allowed = [
       process.env.CLIENT_URL,
       'http://localhost:5173',
       'http://localhost:3000',
     ].filter(Boolean);
-    // Allow Vercel domains and same-origin (no origin header)
+    // Permissive in production to allow Vercel previews and custom domains
     if (!origin || allowed.includes(origin) || /\.vercel\.app$/.test(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // permissive for now — restrict after live testing
+      callback(null, true);
     }
   },
   credentials: true,
@@ -51,6 +53,8 @@ app.use(cors({
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later' }
 });
 app.use('/api/', limiter);
@@ -62,6 +66,110 @@ app.use(morgan('dev'));
 
 // Static files for uploads
 app.use('/uploads', express.static(path.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads')));
+
+// Resilient DB connection singleton for serverless and traditional runtimes
+let dbConnectionPromise: Promise<any> | null = null;
+
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+  if (dbConnectionPromise) {
+    return dbConnectionPromise;
+  }
+
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/atrios';
+
+  dbConnectionPromise = (async () => {
+    try {
+      await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 10000,
+      });
+      const masked = uri.replace(/:([^:@]+)@/, ':****@');
+      console.log('✅ Connected to MongoDB at:', masked);
+    } catch (err: any) {
+      dbConnectionPromise = null;
+      console.error('⚠️ Could not connect to primary MONGODB_URI:', err.message);
+
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(`MongoDB connection failed: ${err.message}`);
+      }
+
+      // Local fallback for dev without MongoDB installed
+      try {
+        const { MongoMemoryServer } = require('mongodb-memory-server');
+        const mongod = await MongoMemoryServer.create();
+        const memUri = mongod.getUri();
+        await mongoose.connect(memUri);
+        console.log('✅ Connected to In-Memory MongoDB at:', memUri);
+        const { seedDatabase } = require('../scripts/seed');
+        await seedDatabase();
+      } catch (memErr: any) {
+        throw new Error(`Both primary and in-memory MongoDB failed: ${memErr.message}`);
+      }
+    }
+  })();
+
+  return dbConnectionPromise;
+};
+
+// Health check endpoint (independent of DB to always diagnose state)
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'disconnected';
+  let dbError: string | null = null;
+
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      await connectDB();
+    }
+    dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'connecting';
+  } catch (err: any) {
+    dbStatus = 'error';
+    dbError = err.message;
+  }
+
+  const rawUri = process.env.MONGODB_URI || '';
+  res.json({
+    success: true,
+    brand: 'Atrios Entertainment',
+    message: 'Atrios API is running',
+    database: {
+      status: dbStatus,
+      readyState: mongoose.connection.readyState,
+      hasMongoUri: Boolean(process.env.MONGODB_URI),
+      previewUri: rawUri ? rawUri.replace(/:([^:@]+)@/, ':****@').substring(0, 45) + '...' : 'NOT_SET',
+      error: dbError,
+    },
+    env: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      hasJwtSecret: Boolean(process.env.JWT_SECRET),
+      hasCloudinary: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
+    },
+    timestamp: new Date(),
+  });
+});
+
+// Middleware to ensure DB is connected before handling any data routes
+app.use(async (req, res, next) => {
+  if (req.path === '/api/health') {
+    return next();
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    try {
+      await connectDB();
+    } catch (err: any) {
+      console.error('Serverless DB middleware error:', err.message);
+      return res.status(500).json({
+        success: false,
+        message: `Database connection error: ${err.message}`,
+        hasMongoUri: Boolean(process.env.MONGODB_URI),
+        hint: process.env.MONGODB_URI ? 'Check MongoDB Atlas network access (allow 0.0.0.0/0)' : 'MONGODB_URI environment variable is missing on Vercel',
+      });
+    }
+  }
+  next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -80,19 +188,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/upload', uploadRoutes);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    success: true,
-    brand: 'Atrios Entertainment',
-    message: 'Atrios API is running',
-    timestamp: new Date()
-  });
-});
-
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' });
+  res.status(404).json({ success: false, message: `Route not found: ${req.method} ${req.url}` });
 });
 
 // Error handler
@@ -105,56 +203,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     success: false,
     message: err.message || 'Internal server error',
   });
-});
-
-// Resilient DB connection: tries MONGODB_URI first, falls back to embedded in-memory MongoDB
-const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/atrios';
-  try {
-    // Attempt standard connection with 10s timeout
-    await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
-    const maskedUri = uri.replace(/:([^:@]+)@/, ':****@');
-    console.log('✅ Connected to MongoDB at:', maskedUri);
-
-    // If database is fresh (no admin user yet), seed the initial data
-    try {
-      const User = require('./models/User').default;
-      const adminExists = await User.findOne({ email: 'admin@atrios.lk' });
-      if (!adminExists) {
-        console.log('🌱 First time setup: Seeding initial database records...');
-        const { seedDatabase } = require('../scripts/seed');
-        await seedDatabase();
-      }
-    } catch (seedErr) {
-      console.warn('⚠️ Seeding check warning:', seedErr);
-    }
-  } catch (err: any) {
-    console.log('⚠️ Could not connect to primary MONGODB_URI. Error:', err.message);
-    // In production (Vercel), cannot run mongodb-memory-server — fail loudly
-    if (process.env.NODE_ENV === 'production') {
-      console.error('❌ Production: MongoDB Atlas connection failed. Check MONGODB_URI env var.');
-      throw err;
-    }
-    console.log('Starting embedded in-memory MongoDB server as fallback...');
-    try {
-      const { MongoMemoryServer } = require('mongodb-memory-server');
-      const mongod = await MongoMemoryServer.create();
-      const memUri = mongod.getUri();
-      await mongoose.connect(memUri);
-      console.log('✅ Connected to Embedded In-Memory MongoDB at:', memUri);
-      // Auto-seed in-memory DB so it is ready immediately
-      const { seedDatabase } = require('../scripts/seed');
-      await seedDatabase();
-    } catch (memErr) {
-      console.error('❌ Failed to start both standard and embedded MongoDB:', memErr);
-      process.exit(1);
-    }
-  }
-};
-
-// Initiate DB connection
-connectDB().catch(err => {
-  console.error('Initial DB connection error:', err);
 });
 
 const PORT = process.env.PORT || 5000;
