@@ -29,6 +29,15 @@ export interface IBusinessSettings extends Document {
     saturday: IBusinessHours;
     sunday: IBusinessHours;
   };
+  workingHours?: {
+    monday?: IBusinessHours;
+    tuesday?: IBusinessHours;
+    wednesday?: IBusinessHours;
+    thursday?: IBusinessHours;
+    friday?: IBusinessHours;
+    saturday?: IBusinessHours;
+    sunday?: IBusinessHours;
+  };
   bookingSettings: {
     minDurationMinutes: number;
     maxDurationMinutes: number;
@@ -58,6 +67,12 @@ export interface IBusinessSettings extends Document {
 
 const defaultHours: IBusinessHours = { open: '10:00', close: '22:00', closed: false };
 
+const businessHoursItemSchema = new Schema<IBusinessHours>({
+  open: { type: String, default: '10:00' },
+  close: { type: String, default: '22:00' },
+  closed: { type: Boolean, default: false },
+}, { _id: false });
+
 const businessSettingsSchema = new Schema<IBusinessSettings>({
   businessName: { type: String, default: 'Atrios Entertainment' },
   logo: String,
@@ -73,14 +88,15 @@ const businessSettingsSchema = new Schema<IBusinessSettings>({
     youtube: String,
   },
   businessHours: {
-    monday: { type: Object, default: defaultHours },
-    tuesday: { type: Object, default: defaultHours },
-    wednesday: { type: Object, default: defaultHours },
-    thursday: { type: Object, default: defaultHours },
-    friday: { type: Object, default: defaultHours },
-    saturday: { type: Object, default: defaultHours },
-    sunday: { type: Object, default: { ...defaultHours, open: '11:00' } },
+    monday: { type: businessHoursItemSchema, default: () => ({ ...defaultHours }) },
+    tuesday: { type: businessHoursItemSchema, default: () => ({ ...defaultHours }) },
+    wednesday: { type: businessHoursItemSchema, default: () => ({ ...defaultHours }) },
+    thursday: { type: businessHoursItemSchema, default: () => ({ ...defaultHours }) },
+    friday: { type: businessHoursItemSchema, default: () => ({ ...defaultHours }) },
+    saturday: { type: businessHoursItemSchema, default: () => ({ ...defaultHours }) },
+    sunday: { type: businessHoursItemSchema, default: () => ({ ...defaultHours, open: '11:00' }) },
   },
+  workingHours: { type: Schema.Types.Mixed },
   bookingSettings: {
     minDurationMinutes: { type: Number, default: 30 },
     maxDurationMinutes: { type: Number, default: 240 },

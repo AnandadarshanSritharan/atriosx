@@ -14,13 +14,41 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.put('/', authenticate, authorize('superadmin', 'manager'), async (req, res) => {
+router.put('/', authenticate, authorize('superadmin', 'manager', 'admin'), async (req, res) => {
   try {
+    const updateData = { ...req.body };
+
+    // Synchronize businessHours and workingHours for complete cross-compatibility
+    if (updateData.workingHours && !updateData.businessHours) {
+      updateData.businessHours = updateData.workingHours;
+    }
+    if (updateData.businessHours && !updateData.workingHours) {
+      updateData.workingHours = updateData.businessHours;
+    }
+
+    // Ensure boolean closed and clean strings for each day
+    if (updateData.businessHours) {
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      for (const d of days) {
+        if (updateData.businessHours[d]) {
+          updateData.businessHours[d] = {
+            open: String(updateData.businessHours[d].open || '10:00').trim(),
+            close: String(updateData.businessHours[d].close || '22:00').trim(),
+            closed: Boolean(updateData.businessHours[d].closed),
+          };
+        }
+      }
+      updateData.workingHours = updateData.businessHours;
+    }
+
     let settings = await BusinessSettings.findOne();
     if (settings) {
-      settings = await BusinessSettings.findByIdAndUpdate(settings._id, req.body, { new: true });
+      settings.set(updateData);
+      settings.markModified('businessHours');
+      settings.markModified('workingHours');
+      await settings.save();
     } else {
-      settings = await BusinessSettings.create(req.body);
+      settings = await BusinessSettings.create(updateData);
     }
     res.json({ success: true, data: settings });
   } catch (err: any) {

@@ -83,9 +83,13 @@ export const bookingService = {
     const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
     const dateObj = new Date(date + 'T00:00:00');
     const dayName = dayNames[dateObj.getDay()];
-    const hours = settings?.businessHours?.[dayName as keyof typeof settings.businessHours];
+    const hours = (settings?.businessHours as any)?.[dayName] || (settings?.workingHours as any)?.[dayName];
     
-    if (!hours || hours.closed) {
+    if (hours?.closed) {
+      return { available: false, slots: [], reason: 'Closed on this day' };
+    }
+    
+    if (!hours) {
       // Check facility-specific availability as fallback
       const facilityDay = facility.availability?.find(a => a.day === dateObj.getDay());
       if (!facilityDay?.available) {
