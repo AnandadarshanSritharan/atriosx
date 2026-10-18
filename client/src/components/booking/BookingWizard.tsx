@@ -5,7 +5,8 @@ import { facilitiesApi } from '@/api/facilities';
 import { gamesApi } from '@/api/games';
 import { useAvailabilityByCategory, useCreateBooking } from '@/hooks/useBookings';
 import BookingConfirmation from './BookingConfirmation';
-import { Users, Gamepad2 } from 'lucide-react';
+import { Users, Gamepad2, AlertCircle } from 'lucide-react';
+import { validateName, validatePhone, validateEmail } from '@/utils/validation';
 
 
 const STEPS = ['Experience', 'Date', 'Time & Players', 'Details', 'Confirm'];
@@ -306,13 +307,60 @@ export default function BookingWizard() {
     document.body.scrollTop = 0;
   }, [step]);
 
+  const [detailsTouched, setDetailsTouched] = useState<Record<string, boolean>>({});
+  const [detailsErrors, setDetailsErrors] = useState<Record<string, string | null>>({});
+
+  const validateDetailsField = (field: string, value: string) => {
+    let err: string | null = null;
+    if (field === 'name') err = validateName(value);
+    if (field === 'phone') err = validatePhone(value);
+    if (field === 'email') err = validateEmail(value, false);
+    setDetailsErrors(prev => ({ ...prev, [field]: err }));
+    return err;
+  };
+
+  const handleDetailsBlur = (field: string) => {
+    setDetailsTouched(prev => ({ ...prev, [field]: true }));
+    validateDetailsField(field, (data as any)[field] || '');
+  };
+
+  const handleDetailsChange = (field: string, value: string) => {
+    setData((prev: any) => ({ ...prev, [field]: value }));
+    if (detailsTouched[field]) {
+      validateDetailsField(field, value);
+    }
+  };
+
   const { mutate: createBooking, isPending } = useCreateBooking();
 
   const handleNext = () => {
+    if (step === 1) {
+      if (!data.categoryId) {
+        setError('Please select an experience category to proceed.');
+        return;
+      }
+    }
     if (step === 2) {
       const todayStr = getTodayDateString();
       if (!data.date || data.date < todayStr) {
         setError('Please select today or an upcoming date to proceed.');
+        return;
+      }
+    }
+    if (step === 3) {
+      if (!data.startTime) {
+        setError('Please select an available start time slot to proceed.');
+        return;
+      }
+    }
+    if (step === 4) {
+      setDetailsTouched({ name: true, phone: true, email: true });
+      const nameErr = validateName(data.name || '');
+      const phoneErr = validatePhone(data.phone || '');
+      const emailErr = validateEmail(data.email || '', false);
+      setDetailsErrors({ name: nameErr, phone: phoneErr, email: emailErr });
+      if (nameErr || phoneErr || emailErr) {
+        setError(nameErr || phoneErr || emailErr || 'Please fill in your details correctly.');
         return;
       }
     }
@@ -345,6 +393,26 @@ export default function BookingWizard() {
 
   const handleSubmit = () => {
     setError('');
+    const nameErr = validateName(data.name || '');
+    const phoneErr = validatePhone(data.phone || '');
+    const emailErr = validateEmail(data.email || '', false);
+    if (nameErr || phoneErr || emailErr) {
+      setStep(4);
+      setDetailsTouched({ name: true, phone: true, email: true });
+      setDetailsErrors({ name: nameErr, phone: phoneErr, email: emailErr });
+      setError(nameErr || phoneErr || emailErr || 'Please check your details.');
+      return;
+    }
+    if (!data.date || data.date < getTodayDateString()) {
+      setStep(2);
+      setError('Please select a valid upcoming date.');
+      return;
+    }
+    if (!data.startTime) {
+      setStep(3);
+      setError('Please choose a session start time.');
+      return;
+    }
     const fullNotes = [
       data.preferredGame ? `Preferred Game: ${data.preferredGame}` : '',
       data.notes || '',
@@ -882,29 +950,115 @@ export default function BookingWizard() {
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>Your Details</h2>
             <p style={{ fontSize: '0.85rem', color: '#6b6b6b', marginBottom: '24px' }}>No account needed. Just your name and phone number.</p>
-            <div style={{ maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {/* Full Name */}
               <div>
-                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', display: 'block' }}>Full Name *</label>
-                <input placeholder="e.g. John Perera" value={data.name || ''} onChange={e => setData({ ...data, name: e.target.value })} style={INPUT_STYLE} />
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', display: 'block' }}>
+                  Full Name <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  placeholder="e.g. John Perera"
+                  value={data.name || ''}
+                  onChange={e => handleDetailsChange('name', e.target.value)}
+                  onBlur={() => handleDetailsBlur('name')}
+                  style={{
+                    ...INPUT_STYLE,
+                    borderColor: detailsTouched.name && detailsErrors.name ? '#ef4444' : detailsTouched.name && !detailsErrors.name && data.name ? '#22c55e60' : '#2a2a2a',
+                  }}
+                />
+                {detailsTouched.name && detailsErrors.name && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', color: '#ff8080', fontSize: '0.78rem', fontWeight: 600 }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                    <span>{detailsErrors.name}</span>
+                  </div>
+                )}
               </div>
+
+              {/* Phone Number */}
               <div>
-                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', display: 'block' }}>Phone Number *</label>
-                <input placeholder="077 XXX XXXX" value={data.phone || ''} onChange={e => setData({ ...data, phone: e.target.value })} style={INPUT_STYLE} />
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', display: 'block' }}>
+                  Phone Number <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <input
+                  placeholder="077 XXX XXXX"
+                  value={data.phone || ''}
+                  onChange={e => handleDetailsChange('phone', e.target.value)}
+                  onBlur={() => handleDetailsBlur('phone')}
+                  style={{
+                    ...INPUT_STYLE,
+                    borderColor: detailsTouched.phone && detailsErrors.phone ? '#ef4444' : detailsTouched.phone && !detailsErrors.phone && data.phone ? '#22c55e60' : '#2a2a2a',
+                  }}
+                />
+                {detailsTouched.phone && detailsErrors.phone && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', color: '#ff8080', fontSize: '0.78rem', fontWeight: 600 }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                    <span>{detailsErrors.phone}</span>
+                  </div>
+                )}
               </div>
+
+              {/* Email (Optional) */}
               <div>
-                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', display: 'block' }}>Email (Optional)</label>
-                <input type="email" placeholder="john@example.com" value={data.email || ''} onChange={e => setData({ ...data, email: e.target.value })} style={INPUT_STYLE} />
+                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', display: 'block' }}>
+                  Email (Optional)
+                </label>
+                <input
+                  type="email"
+                  placeholder="john@example.com"
+                  value={data.email || ''}
+                  onChange={e => handleDetailsChange('email', e.target.value)}
+                  onBlur={() => handleDetailsBlur('email')}
+                  style={{
+                    ...INPUT_STYLE,
+                    borderColor: detailsTouched.email && detailsErrors.email ? '#ef4444' : detailsTouched.email && !detailsErrors.email && data.email ? '#22c55e60' : '#2a2a2a',
+                  }}
+                />
+                {detailsTouched.email && detailsErrors.email && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', color: '#ff8080', fontSize: '0.78rem', fontWeight: 600 }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                    <span>{detailsErrors.email}</span>
+                  </div>
+                )}
               </div>
+
+              {/* Special Requests (Optional) */}
               <div>
-                <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px', display: 'block' }}>Special Requests (Optional)</label>
-                <textarea placeholder="Anything we should know?" rows={3} value={data.notes || ''} onChange={e => setData({ ...data, notes: e.target.value })}
-                  style={{ ...INPUT_STYLE, resize: 'vertical' } as React.CSSProperties} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block' }}>
+                    Special Requests (Optional)
+                  </label>
+                  <span style={{ fontSize: '0.7rem', color: '#6b6b6b', fontFamily: 'monospace' }}>
+                    {(data.notes || '').length}/500
+                  </span>
+                </div>
+                <textarea
+                  placeholder="Anything we should know? (e.g. birthday setup, preferred games, controller count)"
+                  rows={3}
+                  maxLength={500}
+                  value={data.notes || ''}
+                  onChange={e => setData({ ...data, notes: e.target.value })}
+                  style={{ ...INPUT_STYLE, resize: 'vertical' } as React.CSSProperties}
+                />
               </div>
             </div>
+
+            {error && step === 4 && (
+              <div style={{ background: '#8b202020', border: '1px solid #8b202050', borderRadius: '8px', padding: '10px 14px', color: '#ff8080', fontSize: '0.82rem', marginTop: '16px' }}>
+                {error}
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
               <button onClick={handleBack} style={BTN_SECONDARY}>Back</button>
-              <button disabled={!data.name || !data.phone} onClick={handleNext}
-                style={{ ...BTN_PRIMARY, background: (data.name && data.phone) ? '#c0c0c0' : '#2a2a2a', color: (data.name && data.phone) ? '#000' : '#4b4b4b', cursor: (data.name && data.phone) ? 'pointer' : 'not-allowed' }}>
+              <button
+                onClick={handleNext}
+                style={{
+                  ...BTN_PRIMARY,
+                  background: (data.name && data.phone && !detailsErrors.name && !detailsErrors.phone) ? '#c0c0c0' : '#2a2a2a',
+                  color: (data.name && data.phone && !detailsErrors.name && !detailsErrors.phone) ? '#000' : '#6b6b6b',
+                  cursor: 'pointer',
+                }}
+              >
                 Review Booking →
               </button>
             </div>
