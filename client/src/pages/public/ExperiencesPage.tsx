@@ -141,24 +141,6 @@ export default function ExperiencesPage() {
                       >
                         {unitCount} {unitCount === 1 ? 'Station' : 'Stations'} Available
                       </div>
-                      {/* Price badge */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: '12px',
-                          right: '12px',
-                          background: 'rgba(0,0,0,0.85)',
-                          backdropFilter: 'blur(8px)',
-                          padding: '6px 14px',
-                          borderRadius: '20px',
-                          fontSize: '0.8rem',
-                          fontWeight: 800,
-                          color: '#c0c0c0',
-                          border: '1px solid rgba(192,192,192,0.2)',
-                        }}
-                      >
-                        {priceLabel}
-                      </div>
                     </div>
 
                     {/* Content area */}

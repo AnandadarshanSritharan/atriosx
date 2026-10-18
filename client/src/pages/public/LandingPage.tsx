@@ -167,9 +167,6 @@ export default function LandingPage() {
                       <div style={{ position: 'absolute', top: '12px', left: '12px', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', padding: '4px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: '#c0c0c0', border: '1px solid rgba(192,192,192,0.2)' }}>
                         {unitCount} {unitCount === 1 ? 'unit' : 'units'}
                       </div>
-                      <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, color: '#c0c0c0', border: '1px solid rgba(192,192,192,0.2)' }}>
-                        {priceLabel}
-                      </div>
                     </div>
                     <div style={{ padding: '20px' }}>
                       <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>{catName}</h4>
