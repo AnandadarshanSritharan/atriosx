@@ -241,11 +241,16 @@ export const bookingService = {
     return { subtotal, rateSnapshot: facility.hourlyRate };
   },
 
-  // Create a booking with conflict prevention
   async createBooking(params: CreateBookingParams) {
     const facility = await Facility.findById(params.facilityId);
     if (!facility || !facility.active) throw new Error('Facility not available');
-    
+
+    // CRITICAL: Block bookings in the past (using Sri Lanka Asia/Colombo local time)
+    const colomboNow = getColomboNow();
+    if (params.date < colomboNow.dateStr) {
+      throw new Error('Cannot book dates in the past. Please select today or an upcoming date.');
+    }
+
     // Normalize startTime format to strictly HH:mm (supporting formats like "8.27", "8:27", "08:27")
     const cleanTime = String(params.startTime || '09:00').trim().replace(/[.\s,-]/g, ':');
     const parts = cleanTime.split(':');

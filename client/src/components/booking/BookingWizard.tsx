@@ -291,9 +291,34 @@ export default function BookingWizard() {
   });
   const categoryGames = categoryGamesRes || [];
 
+  const getTodayDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Scroll to top whenever step changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [step]);
+
   const { mutate: createBooking, isPending } = useCreateBooking();
 
-  const handleNext = () => { setError(''); setStep(s => s + 1); };
+  const handleNext = () => {
+    if (step === 2) {
+      const todayStr = getTodayDateString();
+      if (!data.date || data.date < todayStr) {
+        setError('Please select today or an upcoming date to proceed.');
+        return;
+      }
+    }
+    setError('');
+    setStep(s => s + 1);
+  };
   const handleBack = () => { setError(''); setStep(s => s - 1); };
 
   // Determine active rate and total based on selected personCount and duration
@@ -345,6 +370,9 @@ export default function BookingWizard() {
 
     createBooking(payload, {
       onSuccess: (res: any) => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
         setSuccessData(res.data?.data || res.data || {
           ...payload,
           categoryName: data.categoryName,
@@ -368,7 +396,14 @@ export default function BookingWizard() {
           preferredGame: data.preferredGame,
           total: successData.total || estimatedTotal,
         }}
-        onReset={() => { setStep(1); setData({ duration: 60, personCount: 1 }); setSuccessData(null); }}
+        onReset={() => {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          setStep(1);
+          setData({ duration: 60, personCount: 1 });
+          setSuccessData(null);
+        }}
       />
     );
   }
@@ -469,15 +504,105 @@ export default function BookingWizard() {
         {step === 2 && (
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>Select Date</h2>
-            <p style={{ fontSize: '0.85rem', color: '#6b6b6b', marginBottom: '24px' }}>
+            <p style={{ fontSize: '0.85rem', color: '#6b6b6b', marginBottom: '20px' }}>
               Choose the date for your <strong style={{ color: '#c0c0c0' }}>{data.categoryName}</strong> session.
             </p>
+
+            {/* Quick date shortcuts for mobile/iPhone tap */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const todayStr = getTodayDateString();
+                  setError('');
+                  setData({ ...data, date: todayStr, startTime: '' });
+                }}
+                style={{
+                  padding: '8px 16px',
+                  background: data.date === getTodayDateString() ? '#c0c0c0' : '#181818',
+                  color: data.date === getTodayDateString() ? '#000000' : '#c0c0c0',
+                  border: `1px solid ${data.date === getTodayDateString() ? '#c0c0c0' : '#2a2a2a'}`,
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Today
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const tom = new Date();
+                  tom.setDate(tom.getDate() + 1);
+                  const y = tom.getFullYear();
+                  const m = String(tom.getMonth() + 1).padStart(2, '0');
+                  const d = String(tom.getDate()).padStart(2, '0');
+                  const tomStr = `${y}-${m}-${d}`;
+                  setError('');
+                  setData({ ...data, date: tomStr, startTime: '' });
+                }}
+                style={{
+                  padding: '8px 16px',
+                  background: (() => {
+                    const tom = new Date();
+                    tom.setDate(tom.getDate() + 1);
+                    const tomStr = `${tom.getFullYear()}-${String(tom.getMonth() + 1).padStart(2, '0')}-${String(tom.getDate()).padStart(2, '0')}`;
+                    return data.date === tomStr ? '#c0c0c0' : '#181818';
+                  })(),
+                  color: (() => {
+                    const tom = new Date();
+                    tom.setDate(tom.getDate() + 1);
+                    const tomStr = `${tom.getFullYear()}-${String(tom.getMonth() + 1).padStart(2, '0')}-${String(tom.getDate()).padStart(2, '0')}`;
+                    return data.date === tomStr ? '#000000' : '#c0c0c0';
+                  })(),
+                  border: `1px solid ${(() => {
+                    const tom = new Date();
+                    tom.setDate(tom.getDate() + 1);
+                    const tomStr = `${tom.getFullYear()}-${String(tom.getMonth() + 1).padStart(2, '0')}-${String(tom.getDate()).padStart(2, '0')}`;
+                    return data.date === tomStr ? '#c0c0c0' : '#2a2a2a';
+                  })()}`,
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                Tomorrow
+              </button>
+            </div>
+
             <input
               type="date"
-              min={new Date().toISOString().split('T')[0]}
+              min={getTodayDateString()}
               max={new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
               value={data.date || ''}
-              onChange={e => setData({ ...data, date: e.target.value })}
+              onChange={e => {
+                const selected = e.target.value;
+                const todayStr = getTodayDateString();
+                if (!selected) {
+                  setData({ ...data, date: '', startTime: '' });
+                  return;
+                }
+                if (selected < todayStr) {
+                  setError('Previous dates cannot be selected. Please choose today or an upcoming date.');
+                  setData({ ...data, date: todayStr, startTime: '' });
+                  return;
+                }
+                setError('');
+                setData({ ...data, date: selected, startTime: '' });
+              }}
+              onBlur={e => {
+                const selected = e.target.value;
+                const todayStr = getTodayDateString();
+                if (selected && selected < todayStr) {
+                  setError('Previous dates cannot be selected. Reset to today.');
+                  setData({ ...data, date: todayStr, startTime: '' });
+                }
+              }}
               style={{
                 display: 'block',
                 padding: '14px 18px',
@@ -493,6 +618,13 @@ export default function BookingWizard() {
                 marginBottom: '12px',
               }}
             />
+
+            {error && step === 2 && (
+              <div style={{ background: '#8b202020', border: '1px solid #8b202050', borderRadius: '8px', padding: '10px 14px', color: '#ff8080', fontSize: '0.82rem', marginBottom: '14px' }}>
+                {error}
+              </div>
+            )}
+
             {data.date && (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#c0c0c010', border: '1px solid #c0c0c030', borderRadius: '8px', padding: '8px 14px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '0.85rem', color: '#c0c0c0', fontWeight: 700 }}>
@@ -534,8 +666,16 @@ export default function BookingWizard() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
               <button onClick={handleBack} style={BTN_SECONDARY}>Back</button>
-              <button disabled={!data.date} onClick={handleNext}
-                style={{ ...BTN_PRIMARY, background: data.date ? '#c0c0c0' : '#2a2a2a', color: data.date ? '#000' : '#4b4b4b', cursor: data.date ? 'pointer' : 'not-allowed' }}>
+              <button
+                disabled={!data.date || data.date < getTodayDateString()}
+                onClick={handleNext}
+                style={{
+                  ...BTN_PRIMARY,
+                  background: (data.date && data.date >= getTodayDateString()) ? '#c0c0c0' : '#2a2a2a',
+                  color: (data.date && data.date >= getTodayDateString()) ? '#000' : '#4b4b4b',
+                  cursor: (data.date && data.date >= getTodayDateString()) ? 'pointer' : 'not-allowed',
+                }}
+              >
                 Next →
               </button>
             </div>
