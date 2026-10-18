@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Download, RotateCcw, Home } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
+import { jsPDF } from 'jspdf';
 
 export default function BookingConfirmation({ booking, onReset }: { booking: any; onReset: () => void }) {
   const { data: settings } = useSettings();
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Scroll to top on mount immediately to fix scroll position
+  // Scroll to top on mount immediately
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
@@ -20,8 +21,8 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
     return () => clearTimeout(timer);
   }, []);
 
-  // Business info from settings with graceful fallbacks
-  const businessName = settings?.businessName || 'ATRIOS ENTERTAINMENT';
+  // Business info from settings with fallbacks
+  const businessName = settings?.businessName || 'Atrios Entertainment';
   const businessAddress = settings?.address || 'No. 146, Nursing Home Road, Hatton, Sri Lanka';
   const businessPhone = settings?.phone || '051 222 3132';
   const businessEmail = settings?.email || 'atriosentertainment@gmail.com';
@@ -45,155 +46,225 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
       })
     : '—';
 
-  // Build the clean, official white paper invoice HTML for direct download
-  const buildInvoiceHtml = () => `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; color: #111111; padding: 24px 20px; background: #ffffff; width: 700px; margin: 0 auto; box-sizing: border-box;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 2px solid #111111; margin-bottom: 20px; gap: 16px;">
-        <div>
-          <h1 style="font-size: 22px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; color: #000000; margin: 0 0 6px 0;">${businessName}</h1>
-          <div style="font-size: 11px; color: #555555; line-height: 1.45;">
-            ${businessAddress}<br/>
-            ${businessPhone} · ${businessEmail}
-          </div>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #666666; margin-bottom: 2px;">BOOKING RECEIPT</div>
-          <div style="font-size: 18px; font-weight: 900; color: #0f4c81; font-family: monospace; letter-spacing: 0.05em; margin-bottom: 6px;">${bookingRef}</div>
-          <span style="display: inline-block; background: #ecfdf5; border: 1px solid #10b981; color: #047857; font-size: 10px; font-weight: 800; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.04em;">● CONFIRMED</span>
-        </div>
-      </div>
-
-      <div style="display: flex; gap: 20px; padding: 16px 20px; background: #fafafa; border-radius: 10px; border: 1px solid #eeeeee; margin-bottom: 24px;">
-        <div style="flex: 1;">
-          <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #777777; margin-bottom: 4px;">Customer Details</div>
-          <div style="font-size: 14px; font-weight: 800; color: #111111;">${customerName}</div>
-          <div style="font-size: 12px; color: #555555; margin-top: 2px;">Phone: ${customerPhone}</div>
-          ${customerEmail && customerEmail !== '—' ? `<div style="font-size: 12px; color: #555555;">Email: ${customerEmail}</div>` : ''}
-        </div>
-        <div style="flex: 1;">
-          <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #777777; margin-bottom: 4px;">Session Schedule</div>
-          <div style="font-size: 14px; font-weight: 800; color: #111111;">${formattedDate}</div>
-          <div style="font-size: 12px; color: #555555; margin-top: 2px;">Start Time: <strong style="color: #111111;">${booking.startTime}</strong></div>
-          <div style="font-size: 12px; color: #555555;">Duration: <strong style="color: #111111;">${duration} Minutes</strong></div>
-        </div>
-      </div>
-
-      <table style="width: 100%; border-collapse: collapse; margin-bottom: 22px;">
-        <thead>
-          <tr style="background: #f4f4f4; border-bottom: 1px solid #e0e0e0;">
-            <th style="text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #555555;">Description</th>
-            <th style="text-align: center; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #555555;">Players</th>
-            <th style="text-align: center; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #555555;">Duration</th>
-            <th style="text-align: right; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #555555;">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style="border-bottom: 1px solid #eeeeee;">
-            <td style="text-align: left; padding: 14px; font-size: 13px; color: #111111;">
-              <strong style="display: block; font-size: 13px;">${experienceTitle}</strong>
-              <div style="font-size: 11px; color: #666666; margin-top: 2px;">Gaming & entertainment station booking</div>
-            </td>
-            <td style="text-align: center; padding: 14px; font-size: 13px; color: #333333;">${personCount} ${personCount > 1 ? 'Players' : 'Player'}</td>
-            <td style="text-align: center; padding: 14px; font-size: 13px; color: #333333;">${duration} Mins</td>
-            <td style="text-align: right; padding: 14px; font-size: 13px; font-weight: 800; color: #111111;">Rs. ${totalAmount.toLocaleString()}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #111111; color: #ffffff; border-radius: 10px; margin-bottom: 22px;">
-        <div>
-          <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #cccccc;">Total Payable on Arrival</div>
-          <div style="font-size: 11px; color: #999999; margin-top: 2px;">Payment Method: Pay at Venue (Cash / Card)</div>
-        </div>
-        <div style="font-size: 20px; font-weight: 900; color: #ffffff;">Rs. ${totalAmount.toLocaleString()}</div>
-      </div>
-
-      <div style="padding: 12px 16px; background: #f8fafc; border-left: 3px solid #3b82f6; border-radius: 6px; font-size: 11px; color: #475569; line-height: 1.6; margin-bottom: 22px;">
-        <strong>Arrival Instructions:</strong> Please arrive 10 minutes prior to your scheduled time (${booking.startTime}). Present this receipt or your Reference No. (<strong>${bookingRef}</strong>) at the reception counter.
-      </div>
-
-      <div style="text-align: center; border-top: 1px dashed #dddddd; padding-top: 16px; font-size: 11px; color: #888888; line-height: 1.5;">
-        Thank you for choosing <strong>${businessName}</strong>!<br/>
-        For cancellations or inquiries, please contact us at ${businessPhone}.
-      </div>
-    </div>
-  `;
-
-  // Direct PDF Download
-  const handleDownloadReceipt = async () => {
+  // Direct Vector PDF Generation using jsPDF (100% reliable, never blank)
+  const handleDownloadReceipt = () => {
     setIsDownloading(true);
 
-    const invoiceContainer = document.createElement('div');
-    invoiceContainer.style.width = '700px';
-    invoiceContainer.style.background = '#ffffff';
-    invoiceContainer.style.boxSizing = 'border-box';
-    invoiceContainer.innerHTML = buildInvoiceHtml();
-
-    const opt = {
-      margin: [10, 10, 10, 10],
-      filename: `Receipt-${bookingRef}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    };
-
     try {
-      let html2pdf = (window as any).html2pdf;
-      if (typeof html2pdf !== 'function') {
-        await new Promise<void>((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-          s.onload = () => resolve();
-          s.onerror = () => reject(new Error('Failed to load html2pdf'));
-          document.head.appendChild(s);
-        });
-        html2pdf = (window as any).html2pdf;
+      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+      const contentWidth = pageWidth - (margin * 2);
+      const rightX = pageWidth - margin;
+
+      let y = 20;
+
+      // Header Left: Business Name & Details
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(17);
+      doc.setTextColor(17, 17, 17);
+      doc.text(businessName.toUpperCase(), margin, y);
+
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(85, 85, 85);
+      doc.text(businessAddress, margin, y);
+      y += 4.5;
+      doc.text(`${businessPhone}  ·  ${businessEmail}`, margin, y);
+
+      // Header Right: Reference & Status Badge
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(102, 102, 102);
+      doc.text('BOOKING RECEIPT', rightX, 16, { align: 'right' });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(15, 76, 129);
+      doc.text(bookingRef, rightX, 22.5, { align: 'right' });
+
+      // Status Pill: Confirmed
+      doc.setDrawColor(16, 185, 129);
+      doc.setFillColor(236, 253, 245);
+      doc.roundedRect(rightX - 30, 25.5, 30, 6, 3, 3, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(4, 120, 87);
+      doc.text('● CONFIRMED', rightX - 15, 29.8, { align: 'center' });
+
+      // Horizontal Divider
+      y = 35;
+      doc.setDrawColor(20, 20, 20);
+      doc.setLineWidth(0.6);
+      doc.line(margin, y, rightX, y);
+
+      // Customer Details & Session Schedule Card
+      y += 6;
+      const cardY = y;
+      const cardH = 28;
+      doc.setFillColor(250, 250, 250);
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, cardY, contentWidth, cardH, 3, 3, 'FD');
+
+      // Left Column: Customer Details
+      const col1X = margin + 6;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 120, 120);
+      doc.text('CUSTOMER DETAILS', col1X, cardY + 7);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(20, 20, 20);
+      doc.text(customerName, col1X, cardY + 13);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(90, 90, 90);
+      doc.text(`Phone: ${customerPhone}`, col1X, cardY + 18.5);
+      if (customerEmail && customerEmail !== '—') {
+        doc.text(`Email: ${customerEmail}`, col1X, cardY + 23.5);
       }
 
-      await html2pdf().set(opt).from(invoiceContainer).save();
+      // Right Column: Session Schedule
+      const col2X = margin + (contentWidth / 2) + 4;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(120, 120, 120);
+      doc.text('SESSION SCHEDULE', col2X, cardY + 7);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(20, 20, 20);
+      doc.text(formattedDate, col2X, cardY + 13);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(90, 90, 90);
+      doc.text(`Start Time: ${booking.startTime || '—'}`, col2X, cardY + 18.5);
+      doc.text(`Duration: ${duration} Minutes`, col2X, cardY + 23.5);
+
+      // Items Table Header
+      y = cardY + cardH + 8;
+      const tableHeaderH = 8;
+      doc.setFillColor(243, 244, 246);
+      doc.rect(margin, y, contentWidth, tableHeaderH, 'F');
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y + tableHeaderH, rightX, y + tableHeaderH);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(80, 80, 80);
+      doc.text('DESCRIPTION', margin + 4, y + 5.5);
+      doc.text('PLAYERS', margin + 95, y + 5.5, { align: 'center' });
+      doc.text('DURATION', margin + 135, y + 5.5, { align: 'center' });
+      doc.text('AMOUNT', rightX - 4, y + 5.5, { align: 'right' });
+
+      // Table Row
+      const rowY = y + tableHeaderH;
+      const rowH = 16;
+      doc.setDrawColor(238, 238, 238);
+      doc.line(margin, rowY + rowH, rightX, rowY + rowH);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(20, 20, 20);
+      doc.text(experienceTitle, margin + 4, rowY + 6.5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(110, 110, 110);
+      doc.text('Gaming & entertainment station booking', margin + 4, rowY + 11.5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(50, 50, 50);
+      const playersLabel = `${personCount} ${personCount > 1 ? 'Players' : 'Player'}`;
+      doc.text(playersLabel, margin + 95, rowY + 9, { align: 'center' });
+      doc.text(`${duration} Mins`, margin + 135, rowY + 9, { align: 'center' });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(20, 20, 20);
+      doc.text(`Rs. ${totalAmount.toLocaleString()}`, rightX - 4, rowY + 9, { align: 'right' });
+
+      // Total Payable on Arrival Banner
+      y = rowY + rowH + 8;
+      const totalH = 18;
+      doc.setFillColor(17, 17, 17);
+      doc.roundedRect(margin, y, contentWidth, totalH, 3, 3, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(220, 220, 220);
+      doc.text('TOTAL PAYABLE ON ARRIVAL', margin + 6, y + 7);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Payment Method: Pay at Venue (Cash / Card)', margin + 6, y + 13);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`Rs. ${totalAmount.toLocaleString()}`, rightX - 6, y + 11.5, { align: 'right' });
+
+      // Arrival Instructions Box
+      y += totalH + 6;
+      const noteH = 14;
+      doc.setFillColor(240, 247, 255);
+      doc.roundedRect(margin, y, contentWidth, noteH, 2, 2, 'F');
+      doc.setFillColor(59, 130, 246);
+      doc.rect(margin, y, 2.5, noteH, 'F'); // Blue left border
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(30, 58, 138);
+      doc.text('Arrival Instructions:', margin + 6, y + 5.5);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.8);
+      doc.setTextColor(71, 85, 105);
+      const noteText = `Please arrive 10 minutes prior to your scheduled time (${booking.startTime || '—'}). Present this receipt or your Reference No. (${bookingRef}) at the reception counter.`;
+      const splitText = doc.splitTextToSize(noteText, contentWidth - 12);
+      doc.text(splitText, margin + 6, y + 10);
+
+      // Footer
+      y += noteH + 12;
+      doc.setDrawColor(210, 210, 210);
+      if (typeof (doc as any).setLineDashPattern === 'function') {
+        (doc as any).setLineDashPattern([2, 2], 0);
+      }
+      doc.line(margin, y, rightX, y);
+      if (typeof (doc as any).setLineDashPattern === 'function') {
+        (doc as any).setLineDashPattern([], 0);
+      }
+
+      y += 6;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(90, 90, 90);
+      doc.text(`Thank you for choosing ${businessName}!`, pageWidth / 2, y, { align: 'center' });
+
+      y += 4.5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.8);
+      doc.setTextColor(130, 130, 130);
+      doc.text(`For cancellations or inquiries, please contact us at ${businessPhone}.`, pageWidth / 2, y, { align: 'center' });
+
+      doc.save(`Receipt-${bookingRef}.pdf`);
     } catch (err) {
-      console.error('Failed to download PDF:', err);
-      openPrintWindow();
+      console.error('Failed to generate PDF receipt:', err);
     } finally {
       setIsDownloading(false);
     }
   };
 
-  const openPrintWindow = () => {
-    const printWindow = window.open('', '_blank', 'width=800,height=900');
-    if (!printWindow) {
-      window.print();
-      return;
-    }
-    const htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-  <title>Receipt - ${bookingRef}</title>
-  <style>
-    @page { size: A4; margin: 12mm; }
-    body { margin: 0; padding: 20px; background: #fff; }
-  </style>
-</head>
-<body>
-  ${buildInvoiceHtml()}
-  <script>
-    window.onload = function() { window.print(); };
-  </script>
-</body>
-</html>`;
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
-
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto' }}>
-      {/* Confirmed Card with summary and actions */}
+      {/* Confirmed Card */}
       <div
         style={{
           background: '#111111',
