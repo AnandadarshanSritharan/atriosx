@@ -420,9 +420,6 @@ export default function BookingWizard() {
                   const cat = group.category;
                   const isSelected = data.categoryId === cat._id;
                   const icon = getCategoryIcon(cat.slug);
-                  const priceLabel = group.minRate === group.maxRate
-                    ? `Rs. ${group.minRate.toLocaleString()}/hr`
-                    : `From Rs. ${group.minRate.toLocaleString()}/hr`;
                   const image = cat.image || group.facilities.find(f => f.images?.[0])?.images?.[0];
 
                   return (
@@ -456,7 +453,6 @@ export default function BookingWizard() {
                       </div>
                       <div style={{ padding: '16px' }}>
                         <h3 style={{ fontWeight: 800, color: '#ffffff', fontSize: '0.95rem', marginBottom: '4px' }}>{cat.name}</h3>
-                        <p style={{ fontSize: '0.75rem', color: '#c0c0c0', fontWeight: 600, marginBottom: '2px' }}>{priceLabel}</p>
                         <p style={{ fontSize: '0.7rem', color: '#4b4b4b', margin: 0 }}>
                           {group.facilities.length} {group.facilities.length === 1 ? 'unit' : 'units'} available
                         </p>
