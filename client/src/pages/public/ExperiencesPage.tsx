@@ -84,8 +84,8 @@ export default function ExperiencesPage() {
                 ? `Rs. ${group.minRate.toLocaleString()}/hr`
                 : `From Rs. ${group.minRate.toLocaleString()}/hr`;
 
-              // Find first facility image if available
-              const sampleImage = group.facilities.find(f => f.images?.[0])?.images?.[0];
+              // Find category image first, then first facility image if available
+              const sampleImage = cat.image || group.facilities.find(f => f.images?.[0])?.images?.[0];
               const desc = group.facilities[0]?.description || `Experience high-performance entertainment with our ${catName} setup.`;
 
               // Collect features

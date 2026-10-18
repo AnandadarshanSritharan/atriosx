@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     const { includeInactive } = req.query;
     const query: any = { archived: false };
     if (includeInactive !== 'true') query.active = true;
-    const facilities = await Facility.find(query).populate('category', 'name slug icon').sort({ displayOrder: 1, name: 1 });
+    const facilities = await Facility.find(query).populate('category', 'name slug icon image').sort({ displayOrder: 1, name: 1 });
     res.json({ success: true, data: facilities });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
@@ -67,6 +67,22 @@ router.put('/categories/:id', authenticate, authorize('superadmin', 'manager'), 
   }
 });
 
+// Admin: upload category cover image
+router.post('/categories/:id/image', authenticate, authorize('superadmin', 'manager'), upload.single('image'), async (req: any, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No image uploaded' });
+    const url = getFileUrl(req, req.file.filename, 'categories');
+    const category = await FacilityCategory.findByIdAndUpdate(
+      req.params.id,
+      { image: url },
+      { new: true }
+    );
+    res.json({ success: true, data: { url, category } });
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
 // Admin: delete/deactivate category
 router.delete('/categories/:id', authenticate, authorize('superadmin'), async (req, res) => {
   try {
@@ -82,7 +98,7 @@ router.delete('/categories/:id', authenticate, authorize('superadmin'), async (r
 // Public: get single facility
 router.get('/:id', async (req, res) => {
   try {
-    const facility = await Facility.findById(req.params.id).populate('category', 'name slug icon');
+    const facility = await Facility.findById(req.params.id).populate('category', 'name slug icon image');
     if (!facility || facility.archived) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, data: facility });
   } catch (err: any) {

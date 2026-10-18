@@ -415,7 +415,7 @@ export default function BookingWizard() {
             ) : categoryGroups.length === 0 ? (
               <p style={{ color: '#6b6b6b', textAlign: 'center', padding: '40px' }}>No experiences available right now. Please check back later.</p>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
                 {categoryGroups.map((group) => {
                   const cat = group.category;
                   const isSelected = data.categoryId === cat._id;
@@ -423,6 +423,7 @@ export default function BookingWizard() {
                   const priceLabel = group.minRate === group.maxRate
                     ? `Rs. ${group.minRate.toLocaleString()}/hr`
                     : `From Rs. ${group.minRate.toLocaleString()}/hr`;
+                  const image = cat.image || group.facilities.find(f => f.images?.[0])?.images?.[0];
 
                   return (
                     <div
@@ -432,19 +433,34 @@ export default function BookingWizard() {
                         background: isSelected ? '#c0c0c010' : '#161616',
                         border: `1px solid ${isSelected ? '#c0c0c0' : '#2a2a2a'}`,
                         borderRadius: '12px',
-                        padding: '24px 20px',
+                        overflow: 'hidden',
                         cursor: 'pointer',
                         transition: 'all 0.15s',
+                        display: 'flex',
+                        flexDirection: 'column',
                       }}
                       onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.borderColor = '#3a3a3a'; }}
                       onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a'; }}
                     >
-                      <div style={{ fontSize: '2rem', marginBottom: '12px' }}>{icon}</div>
-                      <h3 style={{ fontWeight: 800, color: '#ffffff', fontSize: '1rem', marginBottom: '6px' }}>{cat.name}</h3>
-                      <p style={{ fontSize: '0.75rem', color: '#c0c0c0', fontWeight: 600, marginBottom: '4px' }}>{priceLabel}</p>
-                      <p style={{ fontSize: '0.7rem', color: '#4b4b4b' }}>
-                        {group.facilities.length} {group.facilities.length === 1 ? 'unit' : 'units'} available
-                      </p>
+                      <div style={{ height: '110px', background: '#0a0a0a', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {image ? (
+                          <img src={image} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '2.5rem', opacity: 0.45 }}>{icon}</span>
+                        )}
+                        {isSelected && (
+                          <div style={{ position: 'absolute', top: '8px', right: '8px', background: '#c0c0c0', color: '#000', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>
+                            ✓
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ padding: '16px' }}>
+                        <h3 style={{ fontWeight: 800, color: '#ffffff', fontSize: '0.95rem', marginBottom: '4px' }}>{cat.name}</h3>
+                        <p style={{ fontSize: '0.75rem', color: '#c0c0c0', fontWeight: 600, marginBottom: '2px' }}>{priceLabel}</p>
+                        <p style={{ fontSize: '0.7rem', color: '#4b4b4b', margin: 0 }}>
+                          {group.facilities.length} {group.facilities.length === 1 ? 'unit' : 'units'} available
+                        </p>
+                      </div>
                     </div>
                   );
                 })}

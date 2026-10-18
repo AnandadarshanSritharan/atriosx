@@ -31,6 +31,7 @@ export interface FacilityCategory {
   name: string;
   slug: string;
   icon?: string;
+  image?: string;
   displayOrder: number;
   active: boolean;
 }

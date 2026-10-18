@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { facilitiesApi } from '@/api/facilities';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Plus, Edit2, Trash2, Layers, Check, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Layers, Check, X, Image as ImageIcon } from 'lucide-react';
 import type { FacilityCategory } from '@/types';
 
 const SLUG_TO_EMOJI: Record<string, string> = {
@@ -62,7 +62,10 @@ export default function CategoriesPage() {
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<FacilityCategory | null>(null);
-  const [formData, setFormData] = useState({ name: '', slug: '', icon: '🎮', displayOrder: 0 });
+  const [formData, setFormData] = useState({ name: '', slug: '', icon: '🎮', displayOrder: 0, image: '' });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Fetch categories
@@ -89,43 +92,20 @@ export default function CategoriesPage() {
     return acc;
   }, {} as Record<string, number>);
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => facilitiesApi.categories.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['facility-categories-admin'] });
-      queryClient.invalidateQueries({ queryKey: ['facility-categories'] });
-      queryClient.invalidateQueries({ queryKey: ['facilities-public'] });
-      closeModal();
-    },
-    onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to create category');
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => facilitiesApi.categories.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['facility-categories-admin'] });
-      queryClient.invalidateQueries({ queryKey: ['facility-categories'] });
-      queryClient.invalidateQueries({ queryKey: ['facilities-public'] });
-      closeModal();
-    },
-    onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || 'Failed to update category');
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (id: string) => facilitiesApi.categories.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['facility-categories-admin'] });
       queryClient.invalidateQueries({ queryKey: ['facility-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['facilities-public'] });
     },
   });
 
   const openAddModal = () => {
     setEditingCategory(null);
-    setFormData({ name: '', slug: '', icon: '🎮', displayOrder: categories.length + 1 });
+    setFormData({ name: '', slug: '', icon: '🎮', displayOrder: categories.length + 1, image: '' });
+    setImageFile(null);
+    setImagePreview('');
     setErrorMsg('');
     setModalOpen(true);
   };
@@ -137,7 +117,10 @@ export default function CategoriesPage() {
       slug: cat.slug,
       icon: cat.icon || SLUG_TO_EMOJI[cat.slug] || '🎮',
       displayOrder: cat.displayOrder || 0,
+      image: cat.image || '',
     });
+    setImageFile(null);
+    setImagePreview(cat.image || '');
     setErrorMsg('');
     setModalOpen(true);
   };
@@ -145,7 +128,17 @@ export default function CategoriesPage() {
   const closeModal = () => {
     setModalOpen(false);
     setEditingCategory(null);
+    setImageFile(null);
+    setImagePreview('');
     setErrorMsg('');
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
   };
 
   const handleNameChange = (name: string) => {
@@ -157,7 +150,7 @@ export default function CategoriesPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     if (!formData.name.trim() || !formData.slug.trim()) {
@@ -165,10 +158,28 @@ export default function CategoriesPage() {
       return;
     }
 
-    if (editingCategory) {
-      updateMutation.mutate({ id: editingCategory._id, data: formData });
-    } else {
-      createMutation.mutate(formData);
+    setIsUploading(true);
+    try {
+      let catId = editingCategory?._id;
+      if (editingCategory) {
+        await facilitiesApi.categories.update(editingCategory._id, formData);
+      } else {
+        const createRes = await facilitiesApi.categories.create(formData);
+        catId = createRes.data?.data?._id;
+      }
+
+      if (imageFile && catId) {
+        await facilitiesApi.categories.uploadImage(catId, imageFile);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['facility-categories-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['facility-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['facilities-public'] });
+      closeModal();
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.message || err.message || 'Failed to save category');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -248,7 +259,7 @@ export default function CategoriesPage() {
                   background: '#111111',
                   border: '1px solid #2a2a2a',
                   borderRadius: '12px',
-                  padding: '24px',
+                  overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
@@ -256,86 +267,119 @@ export default function CategoriesPage() {
                 }}
               >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                      <div
-                        style={{
-                          width: '46px',
-                          height: '46px',
-                          borderRadius: '10px',
-                          background: '#161616',
-                          border: '1px solid #2a2a2a',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1.6rem',
-                        }}
-                      >
-                        {emoji}
+                  {/* Category Image Banner */}
+                  <div
+                    style={{
+                      height: '140px',
+                      background: '#161616',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderBottom: '1px solid #242424',
+                    }}
+                  >
+                    {cat.image ? (
+                      <img
+                        src={cat.image}
+                        alt={cat.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', opacity: 0.4 }}>
+                        <span style={{ fontSize: '2.5rem' }}>{emoji}</span>
+                        <span style={{ fontSize: '0.7rem', color: '#6b6b6b' }}>No real photo uploaded</span>
                       </div>
+                    )}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        left: '10px',
+                        background: 'rgba(0,0,0,0.85)',
+                        backdropFilter: 'blur(8px)',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        color: '#c0c0c0',
+                        border: '1px solid rgba(192,192,192,0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      <span>{emoji}</span>
+                      <span>{cat.name}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '20px 20px 0 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
                       <div>
                         <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', marginBottom: '2px' }}>{cat.name}</h3>
                         <span style={{ fontSize: '0.72rem', color: '#6b6b6b', fontFamily: 'monospace' }}>slug: {cat.slug}</span>
                       </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button
-                        onClick={() => openEditModal(cat)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0c0c0', padding: '6px', borderRadius: '6px' }}
-                        title="Edit Category"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(cat)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b2020', padding: '6px', borderRadius: '6px' }}
-                        title="Deactivate Category"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Assigned Facilities list */}
-                  <div style={{ background: '#0a0a0a', border: '1px solid #1f1f1f', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                        Assigned Units ({unitCount})
-                      </span>
-                    </div>
-
-                    {assignedFacilities.length === 0 ? (
-                      <p style={{ fontSize: '0.75rem', color: '#4b4b4b', margin: 0, fontStyle: 'italic' }}>
-                        No units assigned yet. Edit a facility to assign it here.
-                      </p>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {assignedFacilities.map(f => (
-                          <span
-                            key={f._id}
-                            style={{
-                              fontSize: '0.72rem',
-                              padding: '3px 8px',
-                              background: '#161616',
-                              border: '1px solid #2a2a2a',
-                              borderRadius: '4px',
-                              color: f.active ? '#ffffff' : '#6b6b6b',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                            }}
-                          >
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: f.calendarColor || '#3d85c8' }} />
-                            {f.name}
-                          </span>
-                        ))}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          onClick={() => openEditModal(cat)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c0c0c0', padding: '6px', borderRadius: '6px' }}
+                          title="Edit Category"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(cat)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b2020', padding: '6px', borderRadius: '6px' }}
+                          title="Deactivate Category"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Assigned Facilities list */}
+                    <div style={{ background: '#0a0a0a', border: '1px solid #1f1f1f', borderRadius: '8px', padding: '12px 14px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          Assigned Units ({unitCount})
+                        </span>
+                      </div>
+
+                      {assignedFacilities.length === 0 ? (
+                        <p style={{ fontSize: '0.75rem', color: '#4b4b4b', margin: 0, fontStyle: 'italic' }}>
+                          No units assigned yet. Edit a facility to assign it here.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {assignedFacilities.map(f => (
+                            <span
+                              key={f._id}
+                              style={{
+                                fontSize: '0.72rem',
+                                padding: '3px 8px',
+                                background: '#161616',
+                                border: '1px solid #2a2a2a',
+                                borderRadius: '4px',
+                                color: f.active ? '#ffffff' : '#6b6b6b',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: f.calendarColor || '#3d85c8' }} />
+                              {f.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#6b6b6b', borderTop: '1px solid #1a1a1a', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: '#6b6b6b', borderTop: '1px solid #1a1a1a', padding: '12px 20px', margin: 0 }}>
                   <span>Order: {cat.displayOrder || 0}</span>
                   <span style={{ color: cat.active ? '#2d7a4f' : '#8b2020', fontWeight: 700 }}>
                     {cat.active ? '● Active' : '○ Inactive'}
@@ -367,6 +411,49 @@ export default function CategoriesPage() {
                 </div>
               )}
 
+              {/* Photo Upload & Preview */}
+              <div>
+                <label style={LABEL_STYLE}>Real Experience Photo</label>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      width: '100px',
+                      height: '70px',
+                      borderRadius: '8px',
+                      background: '#0a0a0a',
+                      border: '1px solid #2a2a2a',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <ImageIcon size={26} style={{ color: '#4b4b4b' }} />
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      style={{
+                        width: '100%',
+                        color: '#c0c0c0',
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                      }}
+                    />
+                    <span style={{ display: 'block', marginTop: '6px', fontSize: '0.72rem', color: '#5b5b5b' }}>
+                      Upload real photo (e.g. your PS5 setup, racing rig). Shown in Home, Experiences, and Booking pages.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label style={LABEL_STYLE}>Category Name *</label>
                 <input
@@ -393,7 +480,7 @@ export default function CategoriesPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
-                  <label style={LABEL_STYLE}>Icon / Emoji</label>
+                  <label style={LABEL_STYLE}>Icon / Emoji Fallback</label>
                   <input
                     type="text"
                     placeholder="🎮, 🏎️, 🏓, 🪀, 🎱"
@@ -431,7 +518,7 @@ export default function CategoriesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
+                  disabled={isUploading}
                   style={{
                     padding: '10px 24px',
                     background: '#c0c0c0',
@@ -440,9 +527,10 @@ export default function CategoriesPage() {
                     color: '#000',
                     fontWeight: 700,
                     cursor: 'pointer',
+                    opacity: isUploading ? 0.7 : 1,
                   }}
                 >
-                  {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editingCategory ? 'Save Changes' : 'Create Category'}
+                  {isUploading ? 'Saving & Uploading...' : editingCategory ? 'Save Changes' : 'Create Category'}
                 </button>
               </div>
             </form>

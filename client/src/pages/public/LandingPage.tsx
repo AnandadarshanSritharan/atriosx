@@ -141,7 +141,9 @@ export default function LandingPage() {
                 const priceLabel = minRate === maxRate
                   ? `Rs. ${minRate.toLocaleString()}/hr`
                   : `From Rs. ${minRate.toLocaleString()}/hr`;
-                const sampleImage = group.facilities.find((f: any) => f.images?.[0])?.images?.[0];
+                const sampleImage = (typeof catObj === 'object' && catObj?.image)
+                  ? catObj.image
+                  : group.facilities.find((f: any) => f.images?.[0])?.images?.[0];
                 // Map slug to emoji — never show Lucide component names as text
                 const iconMap: Record<string, string> = {
                   'playstation': '🎮', 'playstation-5': '🎮', 'ps5': '🎮',

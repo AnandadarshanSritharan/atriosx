@@ -17,10 +17,17 @@ export const facilitiesApi = {
   },
   categories: {
     list: () => api.get<ApiResponse<FacilityCategory[]>>('/facilities/categories/all'),
-    create: (data: { name: string; slug: string; icon?: string }) =>
+    create: (data: { name: string; slug: string; icon?: string; image?: string; displayOrder?: number }) =>
       api.post<ApiResponse<FacilityCategory>>('/facilities/categories', data),
     update: (id: string, data: Partial<FacilityCategory>) =>
       api.put<ApiResponse<FacilityCategory>>(`/facilities/categories/${id}`, data),
     delete: (id: string) => api.delete(`/facilities/categories/${id}`),
+    uploadImage: (id: string, file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      return api.post<ApiResponse<{ url: string; category: FacilityCategory }>>(`/facilities/categories/${id}/image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
   },
 };
