@@ -36,14 +36,18 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
     const email = settings?.email || 'contact@atrios.lk';
     const address = settings?.address || 'Premium Entertainment Center, Sri Lanka';
 
+    // Attach off-screen container that html2canvas can properly measure & render
     const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.left = '-9999px';
-    container.style.top = '0';
+    container.style.position = 'absolute';
+    container.style.top = '0px';
+    container.style.left = '0px';
+    container.style.zIndex = '-9999';
+    container.style.opacity = '1';
+    container.style.pointerEvents = 'none';
     container.style.width = '700px';
     container.style.background = '#ffffff';
     container.style.color = '#111111';
-    container.style.fontFamily = "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif";
+    container.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
     container.style.padding = '36px 32px';
     container.style.boxSizing = 'border-box';
 
@@ -132,7 +136,13 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
       margin: 10,
       filename: `Receipt-${bookingRef}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 750,
+      },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
@@ -151,11 +161,13 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
         });
         await (window as any).html2pdf().set(opt).from(container).save();
       }
-    } catch {
-      // If direct PDF generation fails, trigger print
+    } catch (err) {
+      console.error('Failed direct PDF generation:', err);
       window.print();
     } finally {
-      document.body.removeChild(container);
+      if (document.body.contains(container)) {
+        document.body.removeChild(container);
+      }
       setIsDownloading(false);
     }
   };
