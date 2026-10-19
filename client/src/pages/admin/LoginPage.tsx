@@ -54,10 +54,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="mt-8 text-center border-t border-border pt-6">
-          <p className="text-xs text-muted">Test Credentials:</p>
-          <p className="text-xs text-silver mt-1 font-mono bg-surface-2 inline-block px-2 py-1 rounded">admin@atrios.lk / Admin@123</p>
-        </div>
+
       </div>
     </div>
   );
