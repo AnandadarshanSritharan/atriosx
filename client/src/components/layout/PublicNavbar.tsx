@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { MapPin } from 'lucide-react';
+
+const GOOGLE_MAPS_URL = 'https://www.google.com/maps/dir//Atrios+Entertainment,+Nursing+home,+No+146+road,+Hatton+22000/@6.8470442,79.9304625,14z/data=!4m8!4m7!1m0!1m5!1m1!1s0x3ae39bbd514dbf33:0x3ec43729f477b4c5!2m2!1d80.5968243!2d6.8975784?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D';
 
 export function PublicNavbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -151,6 +154,41 @@ export function PublicNavbar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px' }}>
             {!isMobile ? (
               <>
+                <a
+                  href={GOOGLE_MAPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    height: '38px',
+                    padding: '0 16px',
+                    backgroundColor: 'transparent',
+                    color: '#c0c0c0',
+                    fontSize: '0.8rem',
+                    fontWeight: '700',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    textDecoration: 'none',
+                    borderRadius: '6px',
+                    border: '1px solid #2a2a2a',
+                    transition: 'all 0.15s ease',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = '#c0c0c0';
+                    (e.currentTarget as HTMLElement).style.color = '#ffffff';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a';
+                    (e.currentTarget as HTMLElement).style.color = '#c0c0c0';
+                  }}
+                >
+                  <MapPin size={14} />
+                  Find Us
+                </a>
+
                 <Link
                   to="/book"
                   style={{
@@ -179,6 +217,33 @@ export function PublicNavbar() {
               </>
             ) : (
               <>
+                <a
+                  href={GOOGLE_MAPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    height: '34px',
+                    padding: '0 10px',
+                    backgroundColor: 'transparent',
+                    color: '#c0c0c0',
+                    fontSize: '0.72rem',
+                    fontWeight: '700',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    textDecoration: 'none',
+                    borderRadius: '5px',
+                    border: '1px solid #2a2a2a',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <MapPin size={12} />
+                  Find Us
+                </a>
+
                 <Link
                   to="/book"
                   style={{
@@ -298,6 +363,30 @@ export function PublicNavbar() {
             </div>
 
             <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <a
+                href={GOOGLE_MAPS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  height: '44px',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #2a2a2a',
+                  color: '#c0c0c0',
+                  fontSize: '0.82rem',
+                  fontWeight: '700',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  textDecoration: 'none',
+                  borderRadius: '6px',
+                }}
+              >
+                <MapPin size={15} />
+                Find Us on Google Maps
+              </a>
               <Link
                 to="/book"
                 style={{
