@@ -40,8 +40,9 @@ export default function AdminCalendar({ externalOpenModal, onExternalModalClose 
           facilityId: facilities?.[0]?._id,
         },
       });
+      if (onExternalModalClose) onExternalModalClose();
     }
-  }, [externalOpenModal, facilities]);
+  }, [externalOpenModal]);
 
   const handleCloseModal = () => {
     setModalState({ type: 'none' });

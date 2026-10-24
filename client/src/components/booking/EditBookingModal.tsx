@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi } from '@/api/bookings';
 import { X, User, Phone, Mail, AlertCircle, Edit3, DollarSign } from 'lucide-react';
@@ -50,9 +50,13 @@ export function EditBookingModal({ isOpen, onClose, booking, facilities = [] }: 
     return !nonEditable.includes(booking.status);
   }, [booking]);
 
-  // Pre-fill form when booking changes
+  const prevBookingIdRef = useRef<string | null>(null);
+
+  // Pre-fill form when modal opens or a different booking is selected
   useEffect(() => {
-    if (isOpen && booking) {
+    const currentId = booking?._id || booking?.id;
+    if (isOpen && booking && currentId !== prevBookingIdRef.current) {
+      prevBookingIdRef.current = currentId;
       setError('');
       setCustomerName(booking.customer?.name || booking.name || '');
       setCustomerPhone(booking.customer?.phone || booking.phone || '');
@@ -64,6 +68,9 @@ export function EditBookingModal({ isOpen, onClose, booking, facilities = [] }: 
       setPersonCount(booking.personCount || 1);
       setTotal(booking.total ?? booking.totalAmount ?? 0);
       setNotes(booking.notes || '');
+    }
+    if (!isOpen) {
+      prevBookingIdRef.current = null;
     }
   }, [isOpen, booking, facilities]);
 

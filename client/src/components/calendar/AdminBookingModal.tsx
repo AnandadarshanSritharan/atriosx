@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCreateBooking } from '@/hooks/useBookings';
 import { Zap, Clock, AlertCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -32,12 +32,9 @@ export function normalizeTimeString(val: string): string {
 }
 
 export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [] }: AdminBookingModalProps) {
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const nowStr = format(new Date(), 'HH:mm');
-
   const [facilityId, setFacilityId] = useState('');
-  const [date, setDate] = useState(todayStr);
-  const [timeInput, setTimeInput] = useState(nowStr);
+  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [timeInput, setTimeInput] = useState(() => format(new Date(), 'HH:mm'));
   const [duration, setDuration] = useState(60);
   const [personCount, setPersonCount] = useState(1);
   const [customerName, setCustomerName] = useState('');
@@ -48,14 +45,16 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
 
   const { mutate: createBooking, isPending } = useCreateBooking();
 
-  // Populate from initialData when modal opens
+  const prevIsOpenRef = useRef(false);
+
+  // Populate from initialData ONLY when modal opens (transitions from closed to open)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       setError('');
       const defaultFacility = initialData?.facilityId || (facilities[0]?._id ?? '');
       setFacilityId(defaultFacility);
-      setDate(initialData?.date || todayStr);
-      setTimeInput(normalizeTimeString(initialData?.startTime || nowStr));
+      setDate(initialData?.date || format(new Date(), 'yyyy-MM-dd'));
+      setTimeInput(normalizeTimeString(initialData?.startTime || format(new Date(), 'HH:mm')));
       setDuration(Number(initialData?.duration || 60));
       setPersonCount(Number(initialData?.personCount || 1));
       setCustomerName(initialData?.name || initialData?.customerName || '');
@@ -63,7 +62,15 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
       setStatus(initialData?.status || 'confirmed');
       setNotes(initialData?.notes || '');
     }
-  }, [isOpen, initialData, facilities, todayStr, nowStr]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialData, facilities]);
+
+  // If facilities was empty when modal opened, set initial facility once facilities are available
+  useEffect(() => {
+    if (isOpen && !facilityId && facilities.length > 0) {
+      setFacilityId(initialData?.facilityId || facilities[0]._id);
+    }
+  }, [isOpen, facilities, facilityId, initialData?.facilityId]);
 
   // Selected facility object
   const selectedFacility = useMemo(() => {
@@ -118,7 +125,7 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
 
     const payload = {
       facilityId: targetFacId,
-      date: date || todayStr,
+      date: date || format(new Date(), 'yyyy-MM-dd'),
       startTime: formattedStartTime,
       durationMinutes: Number(duration || 60),
       duration: Number(duration || 60),
