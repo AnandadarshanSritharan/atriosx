@@ -2,7 +2,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi } from '@/api/bookings';
 import { useState } from 'react';
-import { ArrowLeft, Phone, Mail, Calendar, Clock, DollarSign, User, CheckCircle2, XCircle, AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, Calendar, Clock, DollarSign, User, CheckCircle2, XCircle, AlertCircle, Edit2, Edit3, Trash2 } from 'lucide-react';
+import { facilitiesApi } from '@/api/facilities';
+import { EditBookingModal } from '@/components/booking/EditBookingModal';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   confirmed:  { bg: '#3d85c815', text: '#3d85c8', border: '#3d85c840' },
@@ -51,6 +53,12 @@ export default function BookingDetailPage() {
   });
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const { data: facilitiesData } = useQuery({
+    queryKey: ['facilities-select'],
+    queryFn: () => facilitiesApi.getAll().then(r => r.data.data),
+  });
 
   const { mutate: deleteBooking, isPending: isDeleting } = useMutation({
     mutationFn: () => bookingsApi.delete(id!),
@@ -94,6 +102,30 @@ export default function BookingDetailPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFamily: 'monospace' }}>{booking.bookingNumber}</h1>
             <span style={{ padding: '4px 14px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, background: SC.bg, color: SC.text, border: `1px solid ${SC.border}`, textTransform: 'capitalize' }}>{booking.status === 'confirmed' ? 'Ongoing' : booking.status.replace(/[-_]/g, ' ')}</span>
+            {(booking.status === 'pending' || booking.status === 'confirmed') && (
+              <button
+                onClick={() => setShowEditModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#c0c0c0',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#000000',
+                  padding: '5px 12px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.85'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+              >
+                <Edit3 size={13} />
+                Edit Booking
+              </button>
+            )}
           </div>
           <p style={{ color: '#6b6b6b', fontSize: '0.8rem', marginTop: '4px' }}>Created: {booking.createdAt ? new Date(booking.createdAt).toLocaleString('en-LK') : '—'}</p>
         </div>
@@ -339,6 +371,16 @@ export default function BookingDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Booking Modal */}
+      {showEditModal && (
+        <EditBookingModal
+          isOpen={showEditModal}
+          booking={booking}
+          facilities={facilitiesData}
+          onClose={() => setShowEditModal(false)}
+        />
       )}
     </div>
   );

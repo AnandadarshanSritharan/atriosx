@@ -13,7 +13,7 @@ export const bookingsApi = {
   get: (id: string) => api.get<ApiResponse<Booking>>(`/bookings/${id}`),
   getById: (id: string) => api.get<ApiResponse<Booking>>(`/bookings/${id}`),
   create: (data: any) => api.post<ApiResponse<Booking>>('/bookings', data),
-  update: (id: string, data: Partial<Booking>) => api.put<ApiResponse<Booking>>(`/bookings/${id}`, data),
+  update: (id: string, data: any) => api.put<ApiResponse<Booking>>(`/bookings/${id}`, data),
   updateStatus: (id: string, status: string, note?: string) =>
     api.patch<ApiResponse<Booking>>(`/bookings/${id}/status`, { status, note }),
   checkIn: (id: string) => api.patch<ApiResponse<Booking>>(`/bookings/${id}/checkin`, {}),

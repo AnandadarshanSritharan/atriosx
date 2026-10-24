@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import { bookingService, getColomboNow } from '../services/bookingService';
 import Booking from '../models/Booking';
 import Facility from '../models/Facility';
+import Customer from '../models/Customer';
 import { createAuditLog } from '../middleware/auditLogger';
 import { format } from 'date-fns';
 
@@ -413,27 +414,160 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// Update booking
-router.put('/:id', authenticate, authorize('superadmin', 'manager'), async (req: any, res) => {
-  try {
-    const allowedFields = ['notes', 'bookingSource', 'paymentStatus', 'paymentMethod'];
-    const updates: any = {};
-    allowedFields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
-    updates.updatedBy = req.user._id;
+// Helper to normalize time string (e.g. "8.30", "08:30")
+function normalizeTime(val: string): string {
+  if (!val) return '';
+  const clean = val.trim().replace(/[.\s,-]/g, ':');
+  if (/^\d{3,4}$/.test(clean)) {
+    const padded = clean.padStart(4, '0');
+    return `${padded.slice(0, 2)}:${padded.slice(2)}`;
+  }
+  const parts = clean.split(':');
+  if (parts.length >= 2) {
+    const h = Math.min(23, Math.max(0, parseInt(parts[0], 10) || 0));
+    const m = Math.min(59, Math.max(0, parseInt(parts[1], 10) || 0));
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+  return val;
+}
 
-    const booking = await Booking.findByIdAndUpdate(req.params.id, updates, { new: true })
-      .populate('customer facility');
+// Update booking — only allowed if status is pending or confirmed
+router.put('/:id', authenticate, authorize('superadmin', 'manager', 'admin'), async (req: any, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    // Restriction requested: Cannot edit if completed, cancelled, or no-show
+    const nonEditableStatuses = ['completed', 'cancelled', 'no_show', 'no-show'];
+    if (nonEditableStatuses.includes(booking.status as string)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot edit this booking because it is already ${(booking.status as string) === 'no_show' || (booking.status as string) === 'no-show' ? 'marked as no-show' : booking.status}. Only pending or ongoing bookings can be edited.`
+      });
+    }
+
+    const {
+      name, customerName,
+      phone, customerPhone,
+      email, customerEmail,
+      facilityId, facility: facParam,
+      date, startTime, endTime, duration, durationMinutes,
+      personCount,
+      notes, bookingSource, paymentStatus, paymentMethod,
+      total, discount,
+    } = req.body;
+
+    // Update customer record if details are provided
+    const finalName = (customerName || name || '').trim();
+    const finalPhone = (customerPhone || phone || '').trim();
+    const finalEmail = customerEmail !== undefined ? customerEmail.trim() : (email !== undefined ? email.trim() : undefined);
+
+    if (finalName || finalPhone || finalEmail !== undefined) {
+      const customer = await Customer.findById(booking.customer);
+      if (customer) {
+        if (finalName) customer.name = finalName;
+        if (finalPhone) customer.phone = finalPhone;
+        if (finalEmail !== undefined) customer.email = finalEmail;
+        await customer.save();
+      }
+    }
+
+    // Determine target facility, date, startTime, duration
+    const targetFacilityId = facilityId || facParam || booking.facility;
+    const targetDate = date || booking.date;
+    const targetStartTime = startTime ? normalizeTime(startTime) : booking.startTime;
+    const targetDuration = durationMinutes !== undefined ? Number(durationMinutes) : (duration !== undefined ? Number(duration) : booking.durationMinutes);
+    const targetPersonCount = personCount !== undefined ? Number(personCount) : (booking.personCount || 1);
+
+    // Calculate endTime
+    let targetEndTime = endTime;
+    if (!targetEndTime || startTime || duration || durationMinutes) {
+      const [h, m] = targetStartTime.split(':').map(Number);
+      const totalMinutes = h * 60 + m + targetDuration;
+      const endH = Math.floor(totalMinutes / 60) % 24;
+      const endM = totalMinutes % 60;
+      targetEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    }
+
+    // Check conflict if facility, date, or time changed
+    const timeOrPlaceChanged =
+      targetFacilityId.toString() !== booking.facility.toString() ||
+      targetDate !== booking.date ||
+      targetStartTime !== booking.startTime ||
+      targetEndTime !== booking.endTime;
+
+    if (timeOrPlaceChanged) {
+      const hasConflict = await bookingService.checkConflict({
+        facilityId: targetFacilityId.toString(),
+        date: targetDate,
+        startTime: targetStartTime,
+        endTime: targetEndTime,
+        excludeBookingId: booking._id.toString(),
+      });
+      if (hasConflict) {
+        return res.status(400).json({
+          success: false,
+          message: 'The selected facility is already booked for this time slot. Please choose another time or facility.'
+        });
+      }
+    }
+
+    // Recalculate price if facility, duration or personCount changed, unless custom total passed
+    let subtotal = booking.subtotal;
+    let rateSnapshot = booking.rateSnapshot;
+    let finalDiscount = discount !== undefined ? Number(discount) : booking.discount;
+    let finalTotal = total !== undefined ? Number(total) : booking.total;
+
+    const facilityDoc = await Facility.findById(targetFacilityId);
+    if (facilityDoc && (timeOrPlaceChanged || personCount !== undefined || duration !== undefined || durationMinutes !== undefined)) {
+      const pricing = bookingService.calculatePrice(facilityDoc, targetDuration, targetPersonCount);
+      subtotal = pricing.subtotal;
+      rateSnapshot = pricing.rateSnapshot;
+      if (total === undefined) {
+        finalTotal = Math.max(0, subtotal - finalDiscount);
+      }
+    }
+
+    // Apply updates
+    booking.facility = targetFacilityId;
+    booking.date = targetDate;
+    booking.startTime = targetStartTime;
+    booking.endTime = targetEndTime;
+    booking.durationMinutes = targetDuration;
+    booking.personCount = targetPersonCount;
+    booking.rateSnapshot = rateSnapshot;
+    booking.subtotal = subtotal;
+    booking.discount = finalDiscount;
+    booking.total = finalTotal;
+    if (notes !== undefined) booking.notes = notes;
+    if (bookingSource !== undefined) booking.bookingSource = bookingSource;
+    if (paymentStatus !== undefined) booking.paymentStatus = paymentStatus;
+    if (paymentMethod !== undefined) booking.paymentMethod = paymentMethod;
+    booking.updatedBy = req.user._id;
+
+    booking.auditTrail.push({
+      action: 'updated',
+      by: req.user._id,
+      at: new Date(),
+      note: 'Booking edited by admin',
+    });
+
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(booking._id).populate('customer facility');
 
     await createAuditLog({
       user: req.user,
       action: 'UPDATE',
       entity: 'Booking',
-      entityId: req.params.id,
-      description: `Booking updated`,
+      entityId: booking._id.toString(),
+      description: `Booking ${booking.bookingNumber} updated`,
       ip: req.ip,
     });
 
-    res.json({ success: true, data: booking });
+    res.json({ success: true, data: updatedBooking });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }

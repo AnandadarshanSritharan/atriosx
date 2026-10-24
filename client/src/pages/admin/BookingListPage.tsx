@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi } from '@/api/bookings';
 import { facilitiesApi } from '@/api/facilities';
-import { Search, Download, Calendar, ChevronLeft, ChevronRight, Eye, Trash2, AlertTriangle } from 'lucide-react';
+import { Search, Download, Calendar, ChevronLeft, ChevronRight, Eye, Trash2, AlertTriangle, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
+import { EditBookingModal } from '@/components/booking/EditBookingModal';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   confirmed:  { bg: '#3d85c815', text: '#3d85c8', border: '#3d85c840' },
@@ -47,6 +48,7 @@ export default function BookingListPage() {
   });
 
   const [bookingToDelete, setBookingToDelete] = useState<any | null>(null);
+  const [bookingToEdit, setBookingToEdit] = useState<any | null>(null);
 
   const { mutate: updateStatus } = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => bookingsApi.updateStatus(id, status),
@@ -223,6 +225,37 @@ export default function BookingListPage() {
                         >
                           <Eye size={15} />
                         </button>
+                        {(b.status === 'pending' || b.status === 'confirmed') && (
+                          <button
+                            onClick={() => setBookingToEdit(b)}
+                            title="Edit Booking"
+                            style={{
+                              background: '#c0c0c015',
+                              border: '1px solid #c0c0c030',
+                              color: '#c0c0c0',
+                              cursor: 'pointer',
+                              padding: '4px 8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={e => {
+                              (e.currentTarget as HTMLElement).style.background = '#c0c0c0';
+                              (e.currentTarget as HTMLElement).style.color = '#000000';
+                            }}
+                            onMouseLeave={e => {
+                              (e.currentTarget as HTMLElement).style.background = '#c0c0c015';
+                              (e.currentTarget as HTMLElement).style.color = '#c0c0c0';
+                            }}
+                          >
+                            <Pencil size={12} />
+                            <span>Edit</span>
+                          </button>
+                        )}
                         {b.status === 'cancelled' && (
                           <button
                             onClick={() => setBookingToDelete(b)}
@@ -415,6 +448,16 @@ export default function BookingListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Booking Modal */}
+      {bookingToEdit && (
+        <EditBookingModal
+          isOpen={!!bookingToEdit}
+          booking={bookingToEdit}
+          facilities={facilitiesData}
+          onClose={() => setBookingToEdit(null)}
+        />
       )}
     </div>
   );
