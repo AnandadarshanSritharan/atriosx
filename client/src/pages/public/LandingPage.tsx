@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useFacilities } from '@/hooks/useFacilities';
 import { useQuery } from '@tanstack/react-query';
 import { gamesApi } from '@/api/games';
@@ -16,6 +16,7 @@ const S = {
 };
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   const { data: facilities, isLoading: facLoading } = useFacilities(false);
   const { data: gamesRes } = useQuery({ queryKey: ['games-public-home'], queryFn: () => gamesApi.getAll({ active: true, limit: 12 }).then(r => r.data.data) });
   const { data: offersRes } = useQuery({ queryKey: ['offers-public'], queryFn: () => offersApi.getAll({ active: true }).then(r => r.data.data), refetchOnMount: 'always' });
@@ -155,34 +156,67 @@ export default function LandingPage() {
                 const icon = iconMap[catSlug?.toLowerCase()] || '🎯';
 
                 return (
-                  <div key={catId} style={{ ...S.card, cursor: 'pointer' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#c0c0c0'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a'; (e.currentTarget as HTMLElement).style.transform = 'none'; }}>
-                    <div style={{ height: '160px', background: '#161616', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {sampleImage ? (
-                        <img src={sampleImage} alt={catName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <span style={{ fontSize: '3.5rem', opacity: 0.45 }}>{icon}</span>
-                      )}
-                      <div style={{ position: 'absolute', top: '12px', left: '12px', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', padding: '4px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: '#c0c0c0', border: '1px solid rgba(192,192,192,0.2)' }}>
-                        {unitCount} {unitCount === 1 ? 'unit' : 'units'}
+                  <div
+                    key={catId}
+                    onClick={() => navigate(`/book?category=${catId}`)}
+                    style={{
+                      ...S.card,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = '#c0c0c0';
+                      (e.currentTarget as HTMLElement).style.transform = 'translateY(-4px)';
+                      const btn = (e.currentTarget as HTMLElement).querySelector('.book-btn') as HTMLElement;
+                      if (btn) {
+                        btn.style.backgroundColor = '#c0c0c0';
+                        btn.style.color = '#000';
+                        btn.style.borderColor = '#c0c0c0';
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a';
+                      (e.currentTarget as HTMLElement).style.transform = 'none';
+                      const btn = (e.currentTarget as HTMLElement).querySelector('.book-btn') as HTMLElement;
+                      if (btn) {
+                        btn.style.backgroundColor = 'transparent';
+                        btn.style.color = '#c0c0c0';
+                        btn.style.borderColor = '#2a2a2a';
+                      }
+                    }}
+                  >
+                    <div>
+                      <div style={{ height: '160px', background: '#161616', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {sampleImage ? (
+                          <img src={sampleImage} alt={catName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '3.5rem', opacity: 0.45 }}>{icon}</span>
+                        )}
+                        <div style={{ position: 'absolute', top: '12px', left: '12px', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', padding: '4px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700, color: '#c0c0c0', border: '1px solid rgba(192,192,192,0.2)' }}>
+                          {unitCount} {unitCount === 1 ? 'unit' : 'units'}
+                        </div>
+                      </div>
+                      <div style={{ padding: '20px 20px 10px' }}>
+                        <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>{catName}</h4>
+                        <p style={{ fontSize: '0.78rem', color: '#6b6b6b', lineHeight: 1.6, marginBottom: '0' }}>
+                          {group.facilities[0]?.description || `Premium ${catName} experience. Up to ${unitCount} simultaneous session${unitCount > 1 ? 's' : ''} available.`}
+                        </p>
                       </div>
                     </div>
-                    <div style={{ padding: '20px' }}>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>{catName}</h4>
-                      <p style={{ fontSize: '0.78rem', color: '#6b6b6b', lineHeight: 1.6, marginBottom: '16px' }}>
-                        {group.facilities[0]?.description || `Premium ${catName} experience. Up to ${unitCount} simultaneous session${unitCount > 1 ? 's' : ''} available.`}
-                      </p>
-                      <Link to={`/book?category=${catId}`} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: '10px', backgroundColor: 'transparent', color: '#c0c0c0',
-                        fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-                        textDecoration: 'none', borderRadius: '6px', border: '1px solid #2a2a2a', transition: 'all 0.2s',
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '#c0c0c0'; (e.currentTarget as HTMLElement).style.color = '#000'; (e.currentTarget as HTMLElement).style.borderColor = '#c0c0c0'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#c0c0c0'; (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a'; }}>
+                    <div style={{ padding: '16px 20px 20px' }}>
+                      <div
+                        className="book-btn"
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: '10px', backgroundColor: 'transparent', color: '#c0c0c0',
+                          fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                          borderRadius: '6px', border: '1px solid #2a2a2a', transition: 'all 0.2s',
+                        }}
+                      >
                         Book a Session
-                      </Link>
+                      </div>
                     </div>
                   </div>
                 );

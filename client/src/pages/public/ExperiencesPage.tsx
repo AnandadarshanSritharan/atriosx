@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useFacilities } from '@/hooks/useFacilities';
 import { useQuery } from '@tanstack/react-query';
 import { facilitiesApi } from '@/api/facilities';
@@ -13,6 +13,7 @@ const SLUG_TO_EMOJI: Record<string, string> = {
 };
 
 export default function ExperiencesPage() {
+  const navigate = useNavigate();
   const { data: facilities, isLoading: loadingFacilities } = useFacilities(false);
   const { data: catRes, isLoading: loadingCategories } = useQuery({
     queryKey: ['facility-categories'],
@@ -94,6 +95,7 @@ export default function ExperiencesPage() {
               return (
                 <div
                   key={cat._id}
+                  onClick={() => navigate(`/book?category=${cat._id}`)}
                   style={{
                     background: '#111111',
                     border: '1px solid #2a2a2a',
@@ -102,17 +104,22 @@ export default function ExperiencesPage() {
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
+                    cursor: 'pointer',
                     transition: 'all 0.25s',
                   }}
                   onMouseEnter={e => {
                     (e.currentTarget as HTMLElement).style.borderColor = '#c0c0c0';
                     (e.currentTarget as HTMLElement).style.transform = 'translateY(-6px)';
                     (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 40px rgba(0,0,0,0.6)';
+                    const btn = (e.currentTarget as HTMLElement).querySelector('.book-btn') as HTMLElement;
+                    if (btn) btn.style.backgroundColor = '#ffffff';
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLElement).style.borderColor = '#2a2a2a';
                     (e.currentTarget as HTMLElement).style.transform = 'none';
                     (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                    const btn = (e.currentTarget as HTMLElement).querySelector('.book-btn') as HTMLElement;
+                    if (btn) btn.style.backgroundColor = '#c0c0c0';
                   }}
                 >
                   <div>
@@ -168,8 +175,8 @@ export default function ExperiencesPage() {
 
                   {/* Action bottom */}
                   <div style={{ padding: '0 24px 24px' }}>
-                    <Link
-                      to={`/book?category=${cat._id}`}
+                    <div
+                      className="book-btn"
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -183,15 +190,11 @@ export default function ExperiencesPage() {
                         fontSize: '0.82rem',
                         letterSpacing: '0.06em',
                         textTransform: 'uppercase',
-                        textDecoration: 'none',
-                        cursor: 'pointer',
                         transition: 'background-color 0.2s',
                       }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '#ffffff'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = '#c0c0c0'; }}
                     >
                       Book a Session →
-                    </Link>
+                    </div>
                   </div>
                 </div>
               );
