@@ -211,8 +211,27 @@ export const bookingService = {
 
   // Generate booking number
   async generateBookingNumber(): Promise<string> {
-    const count = await Booking.countDocuments();
-    return `ATR-${String(count + 1).padStart(6, '0')}`;
+    const lastBooking = await Booking.findOne({ bookingNumber: /^ATR-\d+$/ })
+      .sort({ bookingNumber: -1 })
+      .select('bookingNumber')
+      .lean();
+
+    let nextSeq = 1;
+    if (lastBooking && lastBooking.bookingNumber) {
+      const match = lastBooking.bookingNumber.match(/(\d+)$/);
+      if (match) {
+        nextSeq = parseInt(match[1], 10) + 1;
+      }
+    }
+
+    // Ensure uniqueness even under gaps / concurrency
+    let candidate = `ATR-${String(nextSeq).padStart(6, '0')}`;
+    while (await Booking.exists({ bookingNumber: candidate })) {
+      nextSeq++;
+      candidate = `ATR-${String(nextSeq).padStart(6, '0')}`;
+    }
+
+    return candidate;
   },
 
   // Calculate price for a booking based on duration and number of persons
@@ -317,33 +336,43 @@ export const bookingService = {
     const discount = params.discount || 0;
     const total = Math.max(0, subtotal - discount);
     
-    // Generate booking number
-    const bookingNumber = await this.generateBookingNumber();
-    
     // Determine booking status
     const initialStatus = params.status || (params.createdById ? 'confirmed' : 'pending');
 
-    // Create booking
-    const booking = await Booking.create({
-      bookingNumber,
-      customer: customer._id,
-      facility: params.facilityId,
-      date: params.date,
-      startTime: normalizedStartTime,
-      endTime,
-      durationMinutes: durationMins,
-      personCount,
-      rateSnapshot, // STORED AT BOOKING TIME — never changes
-      subtotal,
-      discount,
-      total,
-      status: initialStatus as any,
-      paymentStatus: 'unpaid',
-      bookingSource: (params.bookingSource || (params.createdById ? 'admin' : 'website')) as any,
-      notes: params.notes,
-      createdBy: params.createdById,
-      auditTrail: [{ action: 'created', at: new Date() }],
-    });
+    // Create booking with automatic retry if duplicate bookingNumber occurs
+    let booking: any;
+    let attempts = 0;
+    while (!booking && attempts < 5) {
+      attempts++;
+      const bookingNumber = await this.generateBookingNumber();
+      try {
+        booking = await Booking.create({
+          bookingNumber,
+          customer: customer._id,
+          facility: params.facilityId,
+          date: params.date,
+          startTime: normalizedStartTime,
+          endTime,
+          durationMinutes: durationMins,
+          personCount,
+          rateSnapshot, // STORED AT BOOKING TIME — never changes
+          subtotal,
+          discount,
+          total,
+          status: initialStatus as any,
+          paymentStatus: 'unpaid',
+          bookingSource: (params.bookingSource || (params.createdById ? 'admin' : 'website')) as any,
+          notes: params.notes,
+          createdBy: params.createdById,
+          auditTrail: [{ action: 'created', at: new Date() }],
+        });
+      } catch (err: any) {
+        if ((err.code === 11000 || err.message?.includes('E11000')) && attempts < 5) {
+          continue;
+        }
+        throw err;
+      }
+    }
     
     // Update customer stats
     customer.totalBookings += 1;
