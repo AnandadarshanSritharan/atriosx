@@ -508,15 +508,22 @@ router.patch('/:id/checkin', authenticate, async (req: any, res) => {
   }
 });
 
-// Soft delete
-router.delete('/:id', authenticate, authorize('superadmin'), async (req: any, res) => {
+// Delete cancelled booking
+router.delete('/:id', authenticate, authorize('superadmin', 'manager', 'admin'), async (req: any, res) => {
   try {
-    await Booking.findByIdAndUpdate(req.params.id, { archived: true });
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+    if (booking.status !== 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Only cancelled bookings can be deleted' });
+    }
+    await Booking.findByIdAndDelete(req.params.id);
     await createAuditLog({
       user: req.user, action: 'DELETE', entity: 'Booking',
-      entityId: req.params.id, description: 'Booking archived', ip: req.ip,
+      entityId: req.params.id, description: `Cancelled booking ${booking.bookingNumber || req.params.id} permanently deleted`, ip: req.ip,
     });
-    res.json({ success: true, message: 'Booking archived' });
+    res.json({ success: true, message: 'Cancelled booking deleted permanently' });
   } catch (err: any) {
     res.status(400).json({ success: false, message: err.message });
   }

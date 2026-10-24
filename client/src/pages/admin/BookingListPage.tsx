@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi } from '@/api/bookings';
 import { facilitiesApi } from '@/api/facilities';
-import { Search, Download, Calendar, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { Search, Download, Calendar, ChevronLeft, ChevronRight, Eye, Trash2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -46,11 +46,25 @@ export default function BookingListPage() {
     placeholderData: (prev) => prev,
   });
 
+  const [bookingToDelete, setBookingToDelete] = useState<any | null>(null);
+
   const { mutate: updateStatus } = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => bookingsApi.updateStatus(id, status),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bookings'] });
       qc.invalidateQueries({ queryKey: ['calendar'] });
+    },
+  });
+
+  const { mutate: deleteBooking, isPending: isDeleting } = useMutation({
+    mutationFn: (id: string) => bookingsApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bookings'] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+      setBookingToDelete(null);
+    },
+    onError: (err: any) => {
+      alert(err?.response?.data?.message || 'Failed to delete booking');
     },
   });
 
@@ -188,7 +202,60 @@ export default function BookingListPage() {
                       </select>
                     </td>
                     <td style={{ padding: '12px 16px', color: '#6b6b6b', fontSize: '0.72rem', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>{sourceVal}</td>
-                    <td style={{ padding: '12px 16px' }}><Eye size={14} color="#4b4b4b" /></td>
+                    <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          onClick={() => navigate(`/admin/bookings/${b._id}`)}
+                          title="View Details"
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#6b6b6b',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            borderRadius: '4px',
+                            transition: 'color 0.15s',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#6b6b6b'; }}
+                        >
+                          <Eye size={15} />
+                        </button>
+                        {b.status === 'cancelled' && (
+                          <button
+                            onClick={() => setBookingToDelete(b)}
+                            title="Delete Cancelled Booking"
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.12)',
+                              border: '1px solid rgba(239, 68, 68, 0.28)',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              padding: '4px 8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={e => {
+                              (e.currentTarget as HTMLElement).style.background = '#ef4444';
+                              (e.currentTarget as HTMLElement).style.color = '#ffffff';
+                            }}
+                            onMouseLeave={e => {
+                              (e.currentTarget as HTMLElement).style.background = 'rgba(239, 68, 68, 0.12)';
+                              (e.currentTarget as HTMLElement).style.color = '#ef4444';
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -216,6 +283,139 @@ export default function BookingListPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {bookingToDelete && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.82)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+          }}
+          onClick={() => !isDeleting && setBookingToDelete(null)}
+        >
+          <div
+            style={{
+              background: '#111111',
+              border: '1px solid #2a2a2a',
+              borderRadius: '16px',
+              maxWidth: '440px',
+              width: '100%',
+              padding: '28px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.85)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <AlertTriangle size={20} color="#ef4444" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+                  Confirm Delete
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: '#8b8b8b', margin: '3px 0 0 0' }}>
+                  This action cannot be undone
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#161616',
+              border: '1px solid #222222',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+              fontSize: '0.8rem',
+              lineHeight: 1.6,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: '#6b6b6b' }}>Booking ID:</span>
+                <span style={{ color: '#ffffff', fontWeight: 700, fontFamily: 'monospace' }}>
+                  {bookingToDelete.bookingNumber || bookingToDelete._id}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: '#6b6b6b' }}>Customer:</span>
+                <span style={{ color: '#ffffff', fontWeight: 600 }}>
+                  {bookingToDelete.customer?.name || bookingToDelete.name || '—'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: '#6b6b6b' }}>Date & Time:</span>
+                <span style={{ color: '#ffffff' }}>
+                  {bookingToDelete.date} ({bookingToDelete.startTime}–{bookingToDelete.endTime})
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#6b6b6b' }}>Status:</span>
+                <span style={{ color: '#ef4444', fontWeight: 700, textTransform: 'capitalize' }}>
+                  {bookingToDelete.status}
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: '#a0a0a0', marginBottom: '24px', lineHeight: 1.5 }}>
+              Are you sure you want to permanently delete this cancelled booking from the database?
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                disabled={isDeleting}
+                onClick={() => setBookingToDelete(null)}
+                style={{
+                  padding: '9px 16px',
+                  background: 'transparent',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '7px',
+                  color: '#c0c0c0',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isDeleting}
+                onClick={() => deleteBooking(bookingToDelete._id)}
+                style={{
+                  padding: '9px 18px',
+                  background: '#dc2626',
+                  border: 'none',
+                  borderRadius: '7px',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: isDeleting ? 0.7 : 1,
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

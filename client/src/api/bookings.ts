@@ -31,4 +31,5 @@ export const bookingsApi = {
     api.get('/bookings/export/excel', { params, responseType: 'blob' }),
   // Notification polling — returns the single most recent booking (admin only)
   getLatestBooking: () => api.get<ApiResponse<any>>('/bookings/latest'),
+  delete: (id: string) => api.delete<ApiResponse<any>>(`/bookings/${id}`),
 };

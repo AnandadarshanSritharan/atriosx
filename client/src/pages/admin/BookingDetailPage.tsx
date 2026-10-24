@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { bookingsApi } from '@/api/bookings';
 import { useState } from 'react';
-import { ArrowLeft, Phone, Mail, Calendar, Clock, DollarSign, User, CheckCircle2, XCircle, AlertCircle, Edit2 } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, Calendar, Clock, DollarSign, User, CheckCircle2, XCircle, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   confirmed:  { bg: '#3d85c815', text: '#3d85c8', border: '#3d85c840' },
@@ -48,6 +48,20 @@ export default function BookingDetailPage() {
   const { mutate: checkIn } = useMutation({
     mutationFn: () => bookingsApi.checkIn(id!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['booking', id] }),
+  });
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  const { mutate: deleteBooking, isPending: isDeleting } = useMutation({
+    mutationFn: () => bookingsApi.delete(id!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bookings'] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+      navigate('/admin/bookings');
+    },
+    onError: (err: any) => {
+      alert(err?.response?.data?.message || 'Failed to delete booking');
+    },
   });
 
   if (isLoading) {
@@ -185,8 +199,147 @@ export default function BookingDetailPage() {
               <span style={{ fontSize: '0.8rem', color: '#8b8b8b' }}>{booking.facility.name}</span>
             </div>
           )}
+
+          {/* Delete Cancelled Booking */}
+          {booking.status === 'cancelled' && (
+            <div style={{ background: '#111111', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '20px' }}>
+              <h3 style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>
+                Delete Cancelled Booking
+              </h3>
+              <p style={{ fontSize: '0.75rem', color: '#8b8b8b', marginBottom: '14px', lineHeight: 1.5 }}>
+                This booking is cancelled and can be permanently removed from the database.
+              </p>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                style={{
+                  width: '100%',
+                  padding: '9px 14px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: '7px',
+                  color: '#ef4444',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.background = '#ef4444';
+                  (e.currentTarget as HTMLElement).style.color = '#ffffff';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(239, 68, 68, 0.12)';
+                  (e.currentTarget as HTMLElement).style.color = '#ef4444';
+                }}
+              >
+                <Trash2 size={14} /> Delete Booking
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.82)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px',
+          }}
+          onClick={() => !isDeleting && setShowDeleteModal(false)}
+        >
+          <div
+            style={{
+              background: '#111111',
+              border: '1px solid #2a2a2a',
+              borderRadius: '16px',
+              maxWidth: '440px',
+              width: '100%',
+              padding: '28px',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.85)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <Trash2 size={20} color="#ef4444" />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ffffff', margin: 0 }}>
+                  Confirm Delete
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: '#8b8b8b', margin: '3px 0 0 0' }}>
+                  This action cannot be undone
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.84rem', color: '#c0c0c0', marginBottom: '20px', lineHeight: 1.6 }}>
+              Are you sure you want to permanently delete booking <strong style={{ color: '#ffffff', fontFamily: 'monospace' }}>{booking.bookingNumber}</strong> ({booking.customer?.name || booking.name || 'Customer'} on {booking.date})?
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                disabled={isDeleting}
+                onClick={() => setShowDeleteModal(false)}
+                style={{
+                  padding: '9px 16px',
+                  background: 'transparent',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '7px',
+                  color: '#c0c0c0',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={isDeleting}
+                onClick={() => deleteBooking()}
+                style={{
+                  padding: '9px 18px',
+                  background: '#dc2626',
+                  border: 'none',
+                  borderRadius: '7px',
+                  color: '#ffffff',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  opacity: isDeleting ? 0.7 : 1,
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
