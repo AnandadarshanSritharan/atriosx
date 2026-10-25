@@ -79,6 +79,13 @@ export function EditBookingModal({ isOpen, onClose, booking, facilities = [] }: 
     return facilities.find(f => f._id === facilityId) || (typeof booking?.facility === 'object' ? booking.facility : null);
   }, [facilities, facilityId, booking]);
 
+  // Reset personCount when facility changes
+  useEffect(() => {
+    if (!facilityId) return;
+    const fac = facilities.find((f: any) => f._id === facilityId);
+    setPersonCount(fac?.pricingTiers?.[0]?.persons || 1);
+  }, [facilityId]);
+
   // Formatted start time & calculated end time
   const formattedStartTime = useMemo(() => normalizeTimeString(startTime) || '10:00', [startTime]);
   const calculatedEndTime = useMemo(() => {
@@ -105,6 +112,10 @@ export function EditBookingModal({ isOpen, onClose, booking, facilities = [] }: 
         setTotal(Math.round(tier.hourlyRate * hours));
         return;
       }
+    }
+    if (duration === 30 && selectedFacility.halfHourRate) {
+      setTotal(selectedFacility.halfHourRate);
+      return;
     }
     const rate = selectedFacility.hourlyRate || 0;
     setTotal(Math.round(rate * hours));
@@ -334,8 +345,40 @@ export function EditBookingModal({ isOpen, onClose, booking, facilities = [] }: 
               </div>
             </div>
 
-            {/* Facility & Players */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '12px' }}>
+            {/* Facility & Optional Controllers (PS5 only) */}
+            {selectedFacility?.pricingTiers && selectedFacility.pricingTiers.length > 1 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#a0a0a0', marginBottom: '4px' }}>Facility</label>
+                  <select
+                    value={facilityId}
+                    onChange={e => setFacilityId(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#ffffff', fontSize: '0.82rem', outline: 'none', cursor: 'pointer' }}
+                  >
+                    {facilities.map((f: any) => (
+                      <option key={f._id} value={f._id}>
+                        {f.name} (Rs. {f.hourlyRate}/hr)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#a0a0a0', marginBottom: '4px' }}>Controllers</label>
+                  <select
+                    value={personCount}
+                    onChange={e => setPersonCount(Number(e.target.value))}
+                    style={{ width: '100%', padding: '8px 10px', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#ffffff', fontSize: '0.82rem', outline: 'none', cursor: 'pointer' }}
+                  >
+                    {selectedFacility.pricingTiers.map((tier: any) => (
+                      <option key={tier.persons} value={tier.persons}>
+                        {tier.persons === 1 ? '1 Controller' : `${tier.persons} Controllers`} (Rs. {tier.hourlyRate}/hr)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
               <div>
                 <label style={{ display: 'block', fontSize: '0.72rem', color: '#a0a0a0', marginBottom: '4px' }}>Facility</label>
                 <select
@@ -350,30 +393,7 @@ export function EditBookingModal({ isOpen, onClose, booking, facilities = [] }: 
                   ))}
                 </select>
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', color: '#a0a0a0', marginBottom: '4px' }}>Players</label>
-                <div style={{ display: 'flex', alignItems: 'center', background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '6px', overflow: 'hidden' }}>
-                  <button
-                    type="button"
-                    onClick={() => setPersonCount(p => Math.max(1, p - 1))}
-                    style={{ width: '32px', height: '34px', background: 'transparent', border: 'none', color: '#c0c0c0', fontSize: '1rem', cursor: 'pointer' }}
-                  >
-                    -
-                  </button>
-                  <span style={{ flex: 1, textAlign: 'center', fontSize: '0.85rem', color: '#ffffff', fontWeight: 700 }}>
-                    {personCount}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPersonCount(p => Math.min(10, p + 1))}
-                    style={{ width: '32px', height: '34px', background: 'transparent', border: 'none', color: '#c0c0c0', fontSize: '1rem', cursor: 'pointer' }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Date & Time */}
             <div style={{ background: '#161616', border: '1px solid #222222', borderRadius: '10px', padding: '16px' }}>

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { facilitiesApi } from '@/api/facilities';
 import { useCreateFacility, useUpdateFacility } from '@/hooks/useFacilities';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ArrowLeft, Save, Plus, Trash2, Users } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Users, DollarSign } from 'lucide-react';
 import type { FacilityCategory } from '@/types';
 
 const SLUG_TO_EMOJI: Record<string, string> = {
@@ -107,11 +107,12 @@ export default function FacilityFormPage() {
             category: categoryId || '',
             color: fac.calendarColor || fac.color || '#3d85c8',
             calendarColor: fac.calendarColor || fac.color || '#3d85c8',
-            pricingTiers: fac.pricingTiers && fac.pricingTiers.length > 0 ? fac.pricingTiers : [
-              { persons: 1, hourlyRate: fac.hourlyRate || 800, halfHourRate: fac.halfHourRate || 500 },
-            ],
+            hourlyRate: fac.hourlyRate || 400,
+            halfHourRate: fac.halfHourRate || Math.round((fac.hourlyRate || 400) * 0.5),
+            pricingTiers: fac.pricingTiers && fac.pricingTiers.length > 0 ? fac.pricingTiers : [],
+            useTierPricing: Boolean(fac.pricingTiers && fac.pricingTiers.length > 1),
             minPersons: fac.minPersons || 1,
-            maxPersons: fac.maxPersons || 4,
+            maxPersons: fac.maxPersons || 1,
           });
         })
         .catch(err => {
@@ -213,19 +214,22 @@ export default function FacilityFormPage() {
       return;
     }
 
-    // Sort tiers by persons ascending
-    const sortedTiers = (formData.pricingTiers || []).slice().sort((a: any, b: any) => a.persons - b.persons);
+    // Sort tiers by persons ascending if tier pricing is enabled
+    const sortedTiers = formData.useTierPricing && formData.pricingTiers?.length > 0
+      ? formData.pricingTiers.slice().sort((a: any, b: any) => a.persons - b.persons)
+      : [];
 
-    const baseHourly = sortedTiers.length > 0 ? sortedTiers[0].hourlyRate : Number(formData.hourlyRate);
+    const baseHourly = sortedTiers.length > 0 ? sortedTiers[0].hourlyRate : Number(formData.hourlyRate || 400);
+    const baseHalfHour = sortedTiers.length > 0 ? (sortedTiers[0]?.halfHourRate || Math.round(baseHourly * 0.5)) : Number(formData.halfHourRate || Math.round(baseHourly * 0.5));
 
     const payload = {
       ...formData,
       category: typeof formData.category === 'object' ? formData.category?._id : formData.category,
       hourlyRate: baseHourly,
-      halfHourRate: sortedTiers[0]?.halfHourRate || formData.halfHourRate || undefined,
+      halfHourRate: baseHalfHour,
       pricingTiers: sortedTiers,
-      minPersons: Number(formData.minPersons || 1),
-      maxPersons: Number(formData.maxPersons || 4),
+      minPersons: 1,
+      maxPersons: sortedTiers.length > 0 ? Math.max(...sortedTiers.map((t: any) => t.persons)) : 1,
       minDurationMinutes: Number(formData.minDurationMinutes || 30),
       maxDurationMinutes: Number(formData.maxDurationMinutes || 180),
       calendarColor: formData.color,
@@ -383,179 +387,188 @@ export default function FacilityFormPage() {
         </div>
 
         {/* PRICING PER PERSON / TIER PRICING */}
+        {/* FACILITY PRICING */}
         <div style={CARD_STYLE}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#ffffff', marginBottom: '4px', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <DollarSign size={16} style={{ color: '#c0c0c0' }} /> Pricing (Rates in Rs.)
+            </h3>
+            <p style={{ fontSize: '0.75rem', color: '#6b6b6b', margin: 0 }}>
+              Set standard rates for this station or table. For PS5, optionally enable multi-controller pricing.
+            </p>
+          </div>
+
+          {/* Flat Unit Rates (Standard for Table Tennis, Carrom, Cockpit) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
             <div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#ffffff', marginBottom: '4px', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Users size={16} style={{ color: '#c0c0c0' }} /> Pricing Per Person / Players
-              </h3>
-              <p style={{ fontSize: '0.75rem', color: '#6b6b6b', margin: 0 }}>
-                Set different rates depending on how many players or persons use this facility (e.g. 1, 2, 3, 4 players).
-              </p>
+              <label style={LABEL_STYLE}>Hourly Rate (Rs.) *</label>
+              <input
+                type="number"
+                min="0"
+                step="50"
+                value={formData.hourlyRate ?? ''}
+                onChange={e => setFormData({ ...formData, hourlyRate: Number(e.target.value) })}
+                style={INPUT_STYLE}
+                required
+              />
+              <span style={{ fontSize: '0.7rem', color: '#6b6b6b', marginTop: '4px', display: 'block' }}>
+                Standard price per 60 minutes
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={handleAddTier}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 14px',
-                background: '#161616',
-                border: '1px solid #2a2a2a',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              <Plus size={14} /> Add Person Tier
-            </button>
+
+            <div>
+              <label style={LABEL_STYLE}>Half-Hour Rate (Rs.)</label>
+              <input
+                type="number"
+                min="0"
+                step="50"
+                placeholder="e.g. 200"
+                value={formData.halfHourRate ?? ''}
+                onChange={e => setFormData({ ...formData, halfHourRate: Number(e.target.value) })}
+                style={INPUT_STYLE}
+              />
+              <span style={{ fontSize: '0.7rem', color: '#6b6b6b', marginTop: '4px', display: 'block' }}>
+                Price for 30 minutes session
+              </span>
+            </div>
           </div>
 
-          {/* Presets */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px', padding: '12px', background: '#0a0a0a', border: '1px solid #1a1a1a', borderRadius: '8px' }}>
-            <span style={{ fontSize: '0.72rem', color: '#6b6b6b', display: 'flex', alignItems: 'center', fontWeight: 600 }}>Presets:</span>
-            <button
-              type="button"
-              onClick={() => applyPreset('ps5')}
-              style={{ fontSize: '0.72rem', padding: '4px 10px', background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#c0c0c0', cursor: 'pointer' }}
-            >
-              🎮 PS5 (1 to 4 Players)
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('duo-quad')}
-              style={{ fontSize: '0.72rem', padding: '4px 10px', background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#c0c0c0', cursor: 'pointer' }}
-            >
-              🏓 2 or 4 Players
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('carrom')}
-              style={{ fontSize: '0.72rem', padding: '4px 10px', background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#c0c0c0', cursor: 'pointer' }}
-            >
-              🪀 Carrom (2 & 4 Players)
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('single')}
-              style={{ fontSize: '0.72rem', padding: '4px 10px', background: '#161616', border: '1px solid #2a2a2a', borderRadius: '6px', color: '#c0c0c0', cursor: 'pointer' }}
-            >
-              🏎️ Single Player (1 Person)
-            </button>
-          </div>
+          {/* Toggle Multi-Controller Pricing (PS5) */}
+          <div style={{ background: '#0a0a0a', border: '1px solid #1f1f1f', borderRadius: '10px', padding: '16px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#ffffff', display: 'block', marginBottom: '2px' }}>
+                  Enable Multi-Controller Pricing (e.g. PS5)
+                </label>
+                <span style={{ fontSize: '0.72rem', color: '#6b6b6b' }}>
+                  Enable this only if the rate changes based on the number of controllers (1, 2, 3, or 4 controllers).
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={Boolean(formData.useTierPricing)}
+                onChange={e => {
+                  const checked = e.target.checked;
+                  if (checked && (!formData.pricingTiers || formData.pricingTiers.length === 0)) {
+                    setFormData({
+                      ...formData,
+                      useTierPricing: true,
+                      pricingTiers: [
+                        { persons: 1, hourlyRate: 400, halfHourRate: 200 },
+                        { persons: 2, hourlyRate: 600, halfHourRate: 300 },
+                        { persons: 3, hourlyRate: 800, halfHourRate: 400 },
+                        { persons: 4, hourlyRate: 1000, halfHourRate: 500 },
+                      ],
+                    });
+                  } else {
+                    setFormData({ ...formData, useTierPricing: checked });
+                  }
+                }}
+                style={{ width: '18px', height: '18px', accentColor: '#c0c0c0', cursor: 'pointer' }}
+              />
+            </div>
 
-          {/* Tiers List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-            {(!formData.pricingTiers || formData.pricingTiers.length === 0) ? (
-              <p style={{ color: '#6b6b6b', fontSize: '0.82rem', margin: 0, fontStyle: 'italic' }}>
-                No person tiers added. Click "+ Add Person Tier" or a preset above.
-              </p>
-            ) : (
-              formData.pricingTiers.map((tier: any, idx: number) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '120px 1fr 1fr 40px',
-                    gap: '12px',
-                    alignItems: 'center',
-                    background: '#0a0a0a',
-                    border: '1px solid #242424',
-                    borderRadius: '8px',
-                    padding: '12px 14px',
-                  }}
-                >
-                  <div>
-                    <label style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-                      Persons
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <input
-                        type="number"
-                        min="1"
-                        max="20"
-                        value={tier.persons}
-                        onChange={e => handleTierChange(idx, 'persons', Number(e.target.value))}
-                        style={{ ...INPUT_STYLE, padding: '8px 10px', fontSize: '0.85rem' }}
-                        required
-                      />
-                      <span style={{ fontSize: '0.78rem', color: '#8b8b8b' }}>p</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-                      Hourly Rate (Rs.)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="50"
-                      value={tier.hourlyRate ?? ''}
-                      onChange={e => handleTierChange(idx, 'hourlyRate', Number(e.target.value))}
-                      style={{ ...INPUT_STYLE, padding: '8px 10px', fontSize: '0.85rem' }}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-                      Half-Hour Rate (Rs.)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="50"
-                      placeholder="Optional"
-                      value={tier.halfHourRate ?? ''}
-                      onChange={e => handleTierChange(idx, 'halfHourRate', Number(e.target.value))}
-                      style={{ ...INPUT_STYLE, padding: '8px 10px', fontSize: '0.85rem' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '16px' }}>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTier(idx)}
-                      style={{ background: 'none', border: 'none', color: '#8b2020', cursor: 'pointer', padding: '6px' }}
-                      title="Remove Tier"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+            {formData.useTierPricing && (
+              <div style={{ marginTop: '18px', borderTop: '1px solid #1a1a1a', paddingTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#c0c0c0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Controller Tiers
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddTier}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 10px',
+                      background: '#161616',
+                      border: '1px solid #2a2a2a',
+                      borderRadius: '6px',
+                      color: '#ffffff',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Plus size={12} /> Add Controller Tier
+                  </button>
                 </div>
-              ))
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {formData.pricingTiers?.map((tier: any, idx: number) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '130px 1fr 1fr 36px',
+                        gap: '10px',
+                        alignItems: 'center',
+                        background: '#111111',
+                        border: '1px solid #242424',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                      }}
+                    >
+                      <div>
+                        <label style={{ fontSize: '0.65rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                          Controllers
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="8"
+                          value={tier.persons}
+                          onChange={e => handleTierChange(idx, 'persons', Number(e.target.value))}
+                          style={{ ...INPUT_STYLE, padding: '6px 8px', fontSize: '0.82rem' }}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.65rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                          Hourly (Rs.)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="50"
+                          value={tier.hourlyRate ?? ''}
+                          onChange={e => handleTierChange(idx, 'hourlyRate', Number(e.target.value))}
+                          style={{ ...INPUT_STYLE, padding: '6px 8px', fontSize: '0.82rem' }}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.65rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                          Half-Hour (Rs.)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="50"
+                          value={tier.halfHourRate ?? ''}
+                          onChange={e => handleTierChange(idx, 'halfHourRate', Number(e.target.value))}
+                          style={{ ...INPUT_STYLE, padding: '6px 8px', fontSize: '0.82rem' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '14px' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTier(idx)}
+                          style={{ background: 'none', border: 'none', color: '#8b2020', cursor: 'pointer', padding: '4px' }}
+                          title="Remove Tier"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
-          </div>
-
-          {/* Min & Max Persons bounds */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderTop: '1px solid #1a1a1a', paddingTop: '16px' }}>
-            <div>
-              <label style={LABEL_STYLE}>Minimum Persons Allowed</label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={formData.minPersons ?? 1}
-                onChange={e => setFormData({ ...formData, minPersons: Number(e.target.value) })}
-                style={INPUT_STYLE}
-              />
-            </div>
-
-            <div>
-              <label style={LABEL_STYLE}>Maximum Persons Allowed</label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={formData.maxPersons ?? 4}
-                onChange={e => setFormData({ ...formData, maxPersons: Number(e.target.value) })}
-                style={INPUT_STYLE}
-              />
-            </div>
           </div>
         </div>
 

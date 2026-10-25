@@ -36,6 +36,7 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
   const bookingRef = booking.bookingNumber || (booking.id ? `ATR-${String(booking.id).padStart(6, '0')}` : 'ATR-000001');
   const totalAmount = Number(booking.total || booking.totalAmount || 0);
   const personCount = Number(booking.personCount || 1);
+  const isPs5 = /ps5|playstation/i.test(experienceTitle);
 
   const formattedDate = booking.date
     ? new Date(booking.date + 'T00:00:00').toLocaleDateString('en-US', {
@@ -158,7 +159,7 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
       doc.setFontSize(8);
       doc.setTextColor(80, 80, 80);
       doc.text('DESCRIPTION', margin + 4, y + 5.5);
-      doc.text('PLAYERS', margin + 95, y + 5.5, { align: 'center' });
+      doc.text(isPs5 ? 'CONTROLLERS' : 'UNIT', margin + 95, y + 5.5, { align: 'center' });
       doc.text('DURATION', margin + 135, y + 5.5, { align: 'center' });
       doc.text('AMOUNT', rightX - 4, y + 5.5, { align: 'right' });
 
@@ -181,8 +182,8 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(50, 50, 50);
-      const playersLabel = `${personCount} ${personCount > 1 ? 'Players' : 'Player'}`;
-      doc.text(playersLabel, margin + 95, rowY + 9, { align: 'center' });
+      const unitLabel = isPs5 ? `${personCount} Controller${personCount > 1 ? 's' : ''}` : '1 Unit';
+      doc.text(unitLabel, margin + 95, rowY + 9, { align: 'center' });
       doc.text(`${duration} Mins`, margin + 135, rowY + 9, { align: 'center' });
 
       doc.setFont('helvetica', 'bold');
@@ -392,10 +393,10 @@ export default function BookingConfirmation({ booking, onReset }: { booking: any
 
               <div>
                 <div style={{ fontSize: '0.68rem', color: '#6b6b6b', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.06em', marginBottom: '4px' }}>
-                  Group Size
+                  {isPs5 ? 'Controllers' : 'Station'}
                 </div>
                 <div style={{ fontSize: '0.9rem', color: '#ffffff', fontWeight: 800 }}>
-                  {personCount} {personCount > 1 ? 'Players' : 'Player'}
+                  {isPs5 ? `${personCount} Controller${personCount > 1 ? 's' : ''}` : '1 Unit Reserved'}
                 </div>
               </div>
             </div>

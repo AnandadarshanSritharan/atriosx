@@ -9,7 +9,7 @@ import { Users, Gamepad2, AlertCircle } from 'lucide-react';
 import { validateName, validatePhone, validateEmail } from '@/utils/validation';
 
 
-const STEPS = ['Experience', 'Date', 'Time & Players', 'Details', 'Confirm'];
+const STEPS = ['Experience', 'Date', 'Time & Duration', 'Details', 'Confirm'];
 
 const BTN_PRIMARY = {
   padding: '12px 28px',
@@ -186,7 +186,7 @@ export default function BookingWizard() {
     const cat = group.category;
     const facs = group.facilities || [];
 
-    // Aggregate person pricing tiers across facilities in this category
+    // Aggregate pricing tiers across facilities in this category (e.g. PS5 controller tiers)
     const tiersMap = new Map<number, { persons: number; hourlyRate: number; halfHourRate?: number }>();
     facs.forEach((f: any) => {
       if (f.pricingTiers && f.pricingTiers.length > 0) {
@@ -198,21 +198,7 @@ export default function BookingWizard() {
       }
     });
 
-    let tiers = Array.from(tiersMap.values()).sort((a, b) => a.persons - b.persons);
-
-    // If no explicit tiers defined, generate default tiers
-    if (tiers.length === 0) {
-      const minP = Math.min(...facs.map((f: any) => f.minPersons || 1));
-      const maxP = Math.max(...facs.map((f: any) => f.maxPersons || 4));
-      for (let p = minP; p <= maxP; p++) {
-        tiers.push({
-          persons: p,
-          hourlyRate: group.minRate,
-          halfHourRate: Math.round(group.minRate * 0.6),
-        });
-      }
-    }
-
+    const tiers = Array.from(tiersMap.values()).sort((a, b) => a.persons - b.persons);
     const defaultPerson = tiers[0]?.persons || 1;
 
     setData({
@@ -223,6 +209,7 @@ export default function BookingWizard() {
       categoryIcon: cat.icon,
       minRate: group.minRate === Infinity ? 0 : group.minRate,
       maxRate: group.maxRate,
+      halfHourRate: facs[0]?.halfHourRate || (group.minRate !== Infinity ? Math.round(group.minRate * 0.5) : 0),
       unitCount: group.facilities.length,
       pricingTiers: tiers,
       personCount: defaultPerson,
@@ -253,14 +240,7 @@ export default function BookingWizard() {
         });
       }
     });
-    let tiers = Array.from(tiersMap.values()).sort((a, b) => a.persons - b.persons);
-    if (tiers.length === 0) {
-      const minP = Math.min(...facs.map((f: any) => f.minPersons || 1));
-      const maxP = Math.max(...facs.map((f: any) => f.maxPersons || 4));
-      for (let p = minP; p <= maxP; p++) {
-        tiers.push({ persons: p, hourlyRate: match.minRate, halfHourRate: Math.round(match.minRate * 0.6) });
-      }
-    }
+    const tiers = Array.from(tiersMap.values()).sort((a, b) => a.persons - b.persons);
 
     setData((prev: any) => ({
       ...prev,
@@ -270,6 +250,7 @@ export default function BookingWizard() {
       categoryIcon: cat.icon,
       minRate: match.minRate === Infinity ? 0 : match.minRate,
       maxRate: match.maxRate,
+      halfHourRate: facs[0]?.halfHourRate || (match.minRate !== Infinity ? Math.round(match.minRate * 0.5) : 0),
       unitCount: facs.length,
       pricingTiers: tiers,
       personCount: tiers[0]?.persons || 1,
@@ -369,7 +350,7 @@ export default function BookingWizard() {
   };
   const handleBack = () => { setError(''); setStep(s => s - 1); };
 
-  // Determine active rate and total based on selected personCount and duration
+  // Determine active rate and total based on selected controllers/tier and duration
   const activeTier = useMemo(() => {
     if (!data.pricingTiers || data.pricingTiers.length === 0) return null;
     return data.pricingTiers.find((t: any) => t.persons === (data.personCount || 1)) || data.pricingTiers[0];
@@ -386,10 +367,13 @@ export default function BookingWizard() {
       return Math.round(activeTier.hourlyRate * (duration / 60));
     }
     if (data.minRate) {
+      if (duration === 30 && data.halfHourRate) {
+        return data.halfHourRate;
+      }
       return Math.round((data.minRate / 60) * duration);
     }
     return 0;
-  }, [activeTier, data.duration, data.minRate]);
+  }, [activeTier, data.duration, data.minRate, data.halfHourRate]);
 
   const handleSubmit = () => {
     setError('');
@@ -750,24 +734,23 @@ export default function BookingWizard() {
           </div>
         )}
 
-        {/* STEP 3 — Select Time, Duration & Players */}
+        {/* STEP 3 — Select Time & Duration */}
         {step === 3 && (
           <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>Time, Duration & Players</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', marginBottom: '6px' }}>Time & Duration</h2>
             <p style={{ fontSize: '0.85rem', color: '#6b6b6b', marginBottom: '20px' }}>
-              Configure your group size and session time. Rates update dynamically.
+              {data.pricingTiers && data.pricingTiers.length > 1
+                ? 'Select your session time, duration, and number of controllers.'
+                : 'Select your session time and duration.'}
             </p>
 
-
-
-
-            {/* PERSON / PLAYER COUNT SELECTOR */}
-            {data.pricingTiers && data.pricingTiers.length > 0 && (
+            {/* CONTROLLER COUNT SELECTOR (Only shown for multi-controller experiences like PS5) */}
+            {data.pricingTiers && data.pricingTiers.length > 1 && (
               <div style={{ marginBottom: '28px', background: '#0a0a0a', border: '1px solid #242424', borderRadius: '12px', padding: '18px 20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Users size={16} style={{ color: '#c0c0c0' }} />
+                  <Gamepad2 size={16} style={{ color: '#c0c0c0' }} />
                   <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
-                    How many people are playing?
+                    How many controllers?
                   </label>
                 </div>
 
@@ -792,12 +775,12 @@ export default function BookingWizard() {
                           flexDirection: 'column',
                           alignItems: 'center',
                           gap: '4px',
-                          minWidth: '100px',
+                          minWidth: '110px',
                           transition: 'all 0.15s',
                         }}
                       >
                         <span style={{ fontWeight: 800 }}>
-                          {tier.persons === 1 ? '1 Person' : `${tier.persons} Persons`}
+                          {tier.persons === 1 ? '1 Controller' : `${tier.persons} Controllers`}
                         </span>
                         <span style={{ fontSize: '0.72rem', opacity: isSelected ? 0.85 : 0.6, fontWeight: 600 }}>
                           Rs. {tier.hourlyRate.toLocaleString()}/hr
@@ -919,7 +902,9 @@ export default function BookingWizard() {
             <div style={{ background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '10px', padding: '14px 18px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ color: '#6b6b6b', fontSize: '0.75rem', display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Rate ({data.personCount || 1} {Number(data.personCount || 1) > 1 ? 'Persons' : 'Person'})
+                  {data.pricingTiers && data.pricingTiers.length > 1
+                    ? `Rate (${data.personCount || 1} Controller${Number(data.personCount || 1) > 1 ? 's' : ''})`
+                    : 'Session Rate'}
                 </span>
                 <span style={{ color: '#c0c0c0', fontWeight: 700, fontSize: '0.88rem' }}>
                   Rs. {activeHourlyRate.toLocaleString()}/hr
@@ -1073,8 +1058,9 @@ export default function BookingWizard() {
             <div style={{ background: '#0a0a0a', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px', marginBottom: '20px' }}>
               {[
                 { label: 'Experience', value: data.categoryName },
-                { label: 'Group Size', value: `${data.personCount || 1} ${Number(data.personCount || 1) > 1 ? 'Persons' : 'Person'}` },
-
+                ...(data.pricingTiers && data.pricingTiers.length > 1 ? [
+                  { label: 'Controllers', value: `${data.personCount || 1} Controller${Number(data.personCount || 1) > 1 ? 's' : ''}` }
+                ] : []),
                 { label: 'Rate Applied', value: `Rs. ${activeHourlyRate.toLocaleString()}/hr` },
                 { label: 'Date', value: data.date ? new Date(data.date + 'T00:00:00').toLocaleDateString('en-LK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '' },
                 { label: 'Time', value: data.startTime },

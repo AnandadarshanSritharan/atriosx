@@ -77,6 +77,10 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
     return facilities.find(f => f._id === facilityId) || facilities[0];
   }, [facilities, facilityId]);
 
+  const hasMultiTiers = useMemo(() => {
+    return Boolean(selectedFacility?.pricingTiers && selectedFacility.pricingTiers.length > 1);
+  }, [selectedFacility]);
+
   // Normalized start time
   const formattedStartTime = useMemo(() => {
     return normalizeTimeString(timeInput) || '09:00';
@@ -240,7 +244,16 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
             </label>
             <select
               value={facilityId}
-              onChange={e => setFacilityId(e.target.value)}
+              onChange={e => {
+                const newId = e.target.value;
+                setFacilityId(newId);
+                const fac = facilities.find(f => f._id === newId);
+                if (fac?.pricingTiers && fac.pricingTiers.length > 1) {
+                  setPersonCount(fac.pricingTiers[0].persons || 1);
+                } else {
+                  setPersonCount(1);
+                }
+              }}
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -462,34 +475,65 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
             </div>
           </div>
 
-          {/* Player Count & Initial Status */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-                Players / Group
-              </label>
-              <select
-                value={personCount}
-                onChange={e => setPersonCount(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: '#0a0a0a',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: '8px',
-                  color: '#ffffff',
-                  fontSize: '0.85rem',
-                  outline: 'none',
-                }}
-              >
-                {[1, 2, 3, 4, 5, 6].map(p => (
-                  <option key={p} value={p} style={{ background: '#111111', color: '#ffffff' }}>
-                    {p} {p === 1 ? 'Player' : 'Players'}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Controllers (PS5 only) & Status */}
+          {hasMultiTiers ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+                  Controllers
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {selectedFacility.pricingTiers.map((tier: any) => {
+                    const isSelected = (personCount || 1) === tier.persons;
+                    return (
+                      <button
+                        key={tier.persons}
+                        type="button"
+                        onClick={() => setPersonCount(tier.persons)}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          fontWeight: isSelected ? 800 : 500,
+                          background: isSelected ? '#c0c0c0' : '#161616',
+                          color: isSelected ? '#000000' : '#8b8b8b',
+                          border: `1px solid ${isSelected ? '#c0c0c0' : '#2a2a2a'}`,
+                          cursor: 'pointer',
+                          transition: 'all 0.1s',
+                        }}
+                      >
+                        {tier.persons === 1 ? '1 Controller' : `${tier.persons} Controllers`} (Rs. {tier.hourlyRate}/hr)
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
+              <div>
+                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: '#0a0a0a',
+                    border: '1px solid #2a2a2a',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                  }}
+                >
+                  <option value="confirmed" style={{ background: '#111111', color: '#ffffff' }}>Ongoing</option>
+                  <option value="completed" style={{ background: '#111111', color: '#ffffff' }}>Completed</option>
+                  <option value="pending" style={{ background: '#111111', color: '#ffffff' }}>Pending</option>
+                </select>
+              </div>
+            </div>
+          ) : (
             <div>
               <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
                 Status
@@ -513,7 +557,7 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
                 <option value="pending" style={{ background: '#111111', color: '#ffffff' }}>Pending</option>
               </select>
             </div>
-          </div>
+          )}
 
           {/* Notes (Optional) */}
           <div>
