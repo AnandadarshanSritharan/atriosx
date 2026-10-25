@@ -8,6 +8,7 @@ import { useCalendarBookings } from '@/hooks/useBookings';
 import { useFacilities } from '@/hooks/useFacilities';
 import { AdminBookingModal } from './AdminBookingModal';
 import { BookingDetailsModal } from './BookingDetailsModal';
+import CalendarAlerts from './CalendarAlerts';
 import { Zap, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -145,6 +146,8 @@ export default function AdminCalendar({ externalOpenModal, onExternalModalClose 
             center: 'title',
             right: 'resourceTimelineDay,timeGridWeek,dayGridMonth',
           }}
+          nowIndicator={true}
+          scrollTime={format(new Date(), 'HH:00:00')}
           resources={resources}
           events={events}
           editable={false}
@@ -183,6 +186,18 @@ export default function AdminCalendar({ externalOpenModal, onExternalModalClose 
             const timeLabel = ext.timeLabel || `${b?.startTime || ''} – ${b?.endTime || ''}`;
             const name = ext.customerName || ext.customer?.name || b?.customer?.name || 'Walk-in Guest';
             const bookingNum = ext.bookingNumber || b?.bookingNumber || '';
+            const status = ext.status || b?.status;
+
+            const now = new Date();
+            const nowMs = now.getTime();
+            const todayStr = format(now, 'yyyy-MM-dd');
+            const dateStr = b?.date || eventInfo.event.startStr?.split('T')[0];
+            const isToday = dateStr === todayStr;
+            const endTimeStr = b?.endTime || ext.endTime;
+            const endMs = isToday && endTimeStr ? new Date(`${dateStr}T${endTimeStr}:00`).getTime() : 0;
+            const diffMins = endMs ? (endMs - nowMs) / 60000 : 999;
+            const isEndingSoon = isToday && status !== 'cancelled' && status !== 'no_show' && status !== 'completed' && diffMins > 0 && diffMins <= 5;
+            const isJustFinished = isToday && status !== 'cancelled' && status !== 'no_show' && diffMins <= 0 && diffMins >= -15;
 
             return (
               <div style={{
@@ -193,6 +208,9 @@ export default function AdminCalendar({ externalOpenModal, onExternalModalClose 
                 justifyContent: 'center',
                 overflow: 'hidden',
                 lineHeight: 1.25,
+                borderRadius: '4px',
+                animation: isEndingSoon ? 'pulseBorderAmber 1.5s infinite' : undefined,
+                border: isEndingSoon ? '1px solid #f5b82e' : undefined,
               }}>
                 <div style={{
                   fontWeight: 800,
@@ -203,10 +221,39 @@ export default function AdminCalendar({ externalOpenModal, onExternalModalClose 
                   textOverflow: 'ellipsis',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'space-between',
                   gap: '4px',
                 }}>
-                  <Clock size={11} style={{ flexShrink: 0 }} />
-                  {timeLabel}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden' }}>
+                    <Clock size={11} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{timeLabel}</span>
+                  </div>
+                  {isEndingSoon && (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      background: '#d4a017',
+                      color: '#000000',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      flexShrink: 0,
+                    }}>
+                      {Math.ceil(diffMins)}m left
+                    </span>
+                  )}
+                  {isJustFinished && (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      background: '#ff453a',
+                      color: '#ffffff',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      flexShrink: 0,
+                    }}>
+                      Finished
+                    </span>
+                  )}
                 </div>
                 <div style={{
                   fontSize: '0.68rem',
@@ -249,6 +296,11 @@ export default function AdminCalendar({ externalOpenModal, onExternalModalClose 
           isOpen={modalState.type === 'detail'}
           onClose={handleCloseModal}
           booking={modalState.data}
+        />
+
+        <CalendarAlerts
+          events={events}
+          onOpenBooking={(bookingData) => setModalState({ type: 'detail', data: bookingData })}
         />
       </div>
     </div>

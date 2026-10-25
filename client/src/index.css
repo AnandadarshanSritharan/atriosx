@@ -228,3 +228,56 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #3a3a3a;
 }
+
+/* FullCalendar Now Indicator (Outlook Style Red Line) */
+.fc .fc-timeline-now-indicator-line,
+.fc .fc-timegrid-now-indicator-line,
+.fc-now-indicator-line {
+  border-color: #ff453a !important;
+  border-left-width: 2px !important;
+  box-shadow: 0 0 10px rgba(255, 69, 58, 0.85) !important;
+  z-index: 20 !important;
+  pointer-events: none;
+}
+
+.fc .fc-timeline-now-indicator-arrow,
+.fc .fc-timegrid-now-indicator-arrow,
+.fc-now-indicator-arrow {
+  border-color: #ff453a !important;
+  border-top-color: #ff453a !important;
+  border-bottom-color: #ff453a !important;
+  z-index: 22 !important;
+}
+
+.fc .fc-timeline-now-indicator-arrow::after,
+.fc .fc-timegrid-now-indicator-arrow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 9px;
+  height: 9px;
+  background-color: #ff453a;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ff453a, 0 0 16px rgba(255, 69, 58, 0.7);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulseBorderAmber {
+  0%, 100% {
+    box-shadow: 0 0 0 1px #d4a017, 0 0 10px rgba(212, 160, 23, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 2px #f5b82e, 0 0 18px rgba(245, 184, 46, 0.8);
+  }
+}
