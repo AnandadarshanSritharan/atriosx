@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { partnersApi } from '@/api/partners';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, RefreshCw } from 'lucide-react';
 
 const COLORS = ['#c0c0c0', '#3d85c8', '#2d7a4f', '#d4a017', '#9b59b6', '#e67e22'];
 
@@ -10,9 +10,7 @@ const emptyForm = {
   name: '',
   email: '',
   phone: '',
-  initialInvestment: '',
-  ownershipPercentage: '',
-  percentageType: 'calculated' as 'calculated' | 'manual',
+  investment: '',
   notes: '',
   joinDate: new Date().toISOString().slice(0, 10),
 };
@@ -53,10 +51,17 @@ export default function PartnersPage() {
 
   const partners: any[] = partnersRes?.data || [];
 
+  // Auto-recalculate equity after any change
+  const recalculateMutation = useMutation({
+    mutationFn: () => partnersApi.recalculate(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['partners'] }),
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: any) => partnersApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['partners'] });
+      // Recalculate equity for all partners after adding
+      recalculateMutation.mutate();
       closeModal();
     },
     onError: (err: any) => {
@@ -67,7 +72,8 @@ export default function PartnersPage() {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => partnersApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['partners'] });
+      // Recalculate equity for all partners after editing
+      recalculateMutation.mutate();
       closeModal();
     },
     onError: (err: any) => {
@@ -78,7 +84,7 @@ export default function PartnersPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => partnersApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['partners'] });
+      recalculateMutation.mutate();
       setDeleteConfirmId(null);
     },
   });
@@ -96,9 +102,7 @@ export default function PartnersPage() {
       name: p.name || '',
       email: p.email || '',
       phone: p.phone || '',
-      initialInvestment: String(p.initialInvestment ?? 0),
-      ownershipPercentage: String(p.ownershipPercentage ?? 0),
-      percentageType: p.percentageType || 'calculated',
+      investment: String(p.initialInvestment ?? p.totalInvestment ?? 0),
       notes: p.notes || '',
       joinDate: p.joinDate ? String(p.joinDate).slice(0, 10) : new Date().toISOString().slice(0, 10),
     });
@@ -120,9 +124,9 @@ export default function PartnersPage() {
       name: formData.name,
       email: formData.email,
       phone: formData.phone,
-      initialInvestment: Number(formData.initialInvestment) || 0,
-      ownershipPercentage: Number(formData.ownershipPercentage) || 0,
-      percentageType: formData.percentageType,
+      // Store as initialInvestment (model field). Server pre-save sets totalInvestment = initialInvestment + additionalInvestments
+      initialInvestment: Number(formData.investment) || 0,
+      percentageType: 'calculated', // Always auto-calculate from investment ratio
       notes: formData.notes,
       joinDate: formData.joinDate,
     };
@@ -135,6 +139,9 @@ export default function PartnersPage() {
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
+  // Total investment across all partners (for equity info line)
+  const totalAllInvestment = partners.reduce((s, p) => s + Number(p.totalInvestment || p.initialInvestment || 0), 0);
+
   // Pie chart data — only partners with ownershipPercentage > 0
   const pieData = partners.filter(p => (p.ownershipPercentage || 0) > 0).map(p => ({
     name: p.name,
@@ -144,17 +151,30 @@ export default function PartnersPage() {
   return (
     <div style={{ padding: '32px', color: '#ffffff', minHeight: '100vh' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ffffff', marginBottom: '4px', letterSpacing: '-0.02em' }}>Partners</h1>
-          <p style={{ color: '#6b6b6b', fontSize: '0.85rem' }}>Manage equity partners and investment records</p>
+          <p style={{ color: '#6b6b6b', fontSize: '0.85rem' }}>
+            Manage equity partners · Total investment pool: <span style={{ color: '#c0c0c0', fontWeight: 700 }}>Rs. {totalAllInvestment.toLocaleString()}</span>
+          </p>
         </div>
-        <button
-          onClick={openAdd}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#c0c0c0', border: 'none', borderRadius: '8px', color: '#000', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
-        >
-          <Plus size={16} /> Add Partner
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={() => recalculateMutation.mutate()}
+            disabled={recalculateMutation.isPending}
+            title="Recalculate equity shares from investment ratios"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px', background: 'transparent', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#c0c0c0', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem' }}
+          >
+            <RefreshCw size={14} style={{ animation: recalculateMutation.isPending ? 'spin 1s linear infinite' : 'none' }} />
+            Recalculate Equity
+          </button>
+          <button
+            onClick={openAdd}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#c0c0c0', border: 'none', borderRadius: '8px', color: '#000', fontWeight: 700, cursor: 'pointer', fontSize: '0.82rem' }}
+          >
+            <Plus size={16} /> Add Partner
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -197,20 +217,20 @@ export default function PartnersPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
-                  <div style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Equity</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#c0c0c0' }}>{Number(p.ownershipPercentage || 0).toFixed(2)}%</div>
+                  <div style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Equity Share</div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#c0c0c0' }}>{Number(p.ownershipPercentage || 0).toFixed(2)}%</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Total Investment</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>Rs. {Number(p.totalInvestment || 0).toLocaleString()}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Initial Investment</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>Rs. {Number(p.initialInvestment || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Investment</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff' }}>Rs. {Number(p.totalInvestment || p.initialInvestment || 0).toLocaleString()}</div>
                 </div>
                 <div>
                   <div style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Phone</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600, color: '#ffffff' }}>{p.phone || '—'}</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#ffffff' }}>{p.phone || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.68rem', color: '#6b6b6b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Joined</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#8b8b8b' }}>{p.joinDate ? new Date(p.joinDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</div>
                 </div>
                 {p.notes && (
                   <div style={{ gridColumn: '1/-1' }}>
@@ -220,17 +240,6 @@ export default function PartnersPage() {
                 )}
               </div>
 
-              {/* Equity type badge */}
-              <div style={{ marginTop: '16px' }}>
-                <span style={{
-                  padding: '3px 10px', borderRadius: '20px', fontSize: '0.68rem', fontWeight: 700,
-                  background: p.percentageType === 'manual' ? '#1e3a5f' : '#1a2a1a',
-                  color: p.percentageType === 'manual' ? '#64b5f6' : '#4caf50',
-                  border: `1px solid ${p.percentageType === 'manual' ? '#1e3a5f' : '#2d7a4f40'}`,
-                }}>
-                  {p.percentageType === 'manual' ? 'Manual equity' : 'Calculated equity'}
-                </span>
-              </div>
             </div>
           ))}
         </div>
@@ -305,44 +314,21 @@ export default function PartnersPage() {
                   <label style={labelStyle}>Phone</label>
                   <input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} style={inputStyle} placeholder="+94 77 ..." />
                 </div>
+
+                {/* Single investment field */}
                 <div>
-                  <label style={labelStyle}>Initial Investment (Rs.)</label>
-                  <input type="number" min="0" value={formData.initialInvestment} onChange={e => setFormData({ ...formData, initialInvestment: e.target.value })} style={inputStyle} placeholder="0" />
+                  <label style={labelStyle}>Investment (Rs.) *</label>
+                  <input type="number" min="0" required value={formData.investment} onChange={e => setFormData({ ...formData, investment: e.target.value })} style={inputStyle} placeholder="e.g. 1250000" />
                 </div>
                 <div>
                   <label style={labelStyle}>Join Date</label>
                   <input type="date" value={formData.joinDate} onChange={e => setFormData({ ...formData, joinDate: e.target.value })} style={{ ...inputStyle, colorScheme: 'dark' }} />
                 </div>
 
-                {/* Equity type */}
-                <div style={{ gridColumn: '1/-1' }}>
-                  <label style={labelStyle}>Equity Type</label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    {(['calculated', 'manual'] as const).map(type => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, percentageType: type })}
-                        style={{
-                          flex: 1, padding: '9px', borderRadius: '7px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                          background: formData.percentageType === type ? '#2a2a2a' : 'transparent',
-                          border: `1px solid ${formData.percentageType === type ? '#c0c0c0' : '#2a2a2a'}`,
-                          color: formData.percentageType === type ? '#ffffff' : '#6b6b6b',
-                        }}
-                      >
-                        {type === 'calculated' ? 'Auto-calculated from investment' : 'Manual percentage'}
-                      </button>
-                    ))}
-                  </div>
+                {/* Info hint */}
+                <div style={{ gridColumn: '1/-1', padding: '10px 14px', background: '#0d1a0d', border: '1px solid #1e3a1e', borderRadius: '8px', fontSize: '0.78rem', color: '#4caf50' }}>
+                  💡 Equity share is automatically calculated from the ratio of each partner's investment to the total pool. Click <strong>Recalculate Equity</strong> after making changes.
                 </div>
-
-                {/* Manual equity percentage */}
-                {formData.percentageType === 'manual' && (
-                  <div style={{ gridColumn: '1/-1' }}>
-                    <label style={labelStyle}>Ownership Percentage (%)</label>
-                    <input type="number" min="0" max="100" step="0.01" value={formData.ownershipPercentage} onChange={e => setFormData({ ...formData, ownershipPercentage: e.target.value })} style={inputStyle} placeholder="e.g. 25" />
-                  </div>
-                )}
 
                 <div style={{ gridColumn: '1/-1' }}>
                   <label style={labelStyle}>Notes</label>

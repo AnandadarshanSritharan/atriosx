@@ -9,5 +9,5 @@ export const partnersApi = {
   delete: (id: string) => api.delete(`/partners/${id}`),
   getDistribution: (params: { dateFrom: string; dateTo: string }) => api.get<ApiResponse<any>>('/partners/distribution', { params }),
   addInvestment: (id: string, data: { amount: number; date: string; note?: string }) => api.post(`/partners/${id}/investments`, data),
-  recalculate: () => api.put('/partners/recalculate', {}),
+  recalculate: () => api.put('/partners/recalculate/all', {}),
 };
