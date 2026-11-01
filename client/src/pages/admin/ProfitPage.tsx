@@ -2,13 +2,24 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '@/api/reports';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Download, Users, TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Download, Users, TrendingUp, DollarSign, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 
 const PARTNER_COLORS = ['#c0c0c0', '#3d85c8', '#2d7a4f', '#d4a017', '#9b59b6', '#e67e22'];
 
+const PERIOD_OPTIONS = [
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'all', label: 'Total Analysis' },
+];
+
 export default function ProfitPage() {
   const [period, setPeriod] = useState('month');
+
+  const isAllTime = period === 'all';
+  const periodLabel = isAllTime ? 'All Time' : (PERIOD_OPTIONS.find(p => p.value === period)?.label || 'Selected Period');
 
   const { data: profitRes, isLoading } = useQuery({
     queryKey: ['reports', 'profit', period],
@@ -62,34 +73,47 @@ export default function ProfitPage() {
         title="Profit & Partner Distribution"
         subtitle="Review lounge net profit calculations and equity distributions"
         actions={
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <select
-              value={period}
-              onChange={e => setPeriod(e.target.value)}
-              style={{
-                padding: '9px 14px',
-                background: '#161616',
-                border: '1px solid #2a2a2a',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '0.85rem',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="month">This Month</option>
-              <option value="last_month">Last Month</option>
-              <option value="week">This Week</option>
-              <option value="today">Today</option>
-              <option value="all">Total Analysis (Since Opening)</option>
-            </select>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '4px', background: '#111111', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {PERIOD_OPTIONS.map(opt => {
+                const isTotal = opt.value === 'all';
+                const isActive = period === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setPeriod(opt.value)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      border: isTotal ? (isActive ? '1px solid #3d85c8' : '1px solid #1e3a5f') : 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: isTotal ? 700 : 600,
+                      transition: 'all 0.15s',
+                      background: isActive
+                        ? (isTotal ? '#3d85c8' : '#c0c0c0')
+                        : (isTotal ? '#131e2b' : 'transparent'),
+                      color: isActive
+                        ? (isTotal ? '#ffffff' : '#000000')
+                        : (isTotal ? '#64b5f6' : '#6b6b6b'),
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {isTotal && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isActive ? '#ffffff' : '#64b5f6' }} />}
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
             <button
               onClick={handleExport}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '10px 18px',
+                padding: '8px 16px',
                 background: '#c0c0c0',
                 border: 'none',
                 borderRadius: '8px',
@@ -105,6 +129,26 @@ export default function ProfitPage() {
         }
       />
 
+      {/* Total Analysis Banner */}
+      {isAllTime && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 18px',
+          background: 'linear-gradient(90deg, #14233a 0%, #111111 100%)',
+          border: '1px solid #1e3a5f',
+          borderRadius: '10px',
+          fontSize: '0.82rem',
+          color: '#90caf9',
+        }}>
+          <Activity size={18} color="#64b5f6" />
+          <span>
+            <strong>Total Analysis Active:</strong> Showing cumulative all-time profit and partner distributions since opening the business.
+          </span>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px' }}>
@@ -117,7 +161,9 @@ export default function ProfitPage() {
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff' }}>
             Rs. {grossRevenue.toLocaleString()}
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>Total earnings before expenses</p>
+          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>
+            {isAllTime ? 'Total earnings since opening' : 'Total earnings before expenses'}
+          </p>
         </div>
 
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px' }}>
@@ -130,7 +176,9 @@ export default function ProfitPage() {
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ff6b6b' }}>
             Rs. {totalExpenses.toLocaleString()}
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>Facility operational costs</p>
+          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>
+            {isAllTime ? 'Total operational costs since opening' : 'Facility operational costs'}
+          </p>
         </div>
 
         <div style={{ background: '#111111', border: `1px solid ${netProfit >= 0 ? '#2d7a4f40' : '#8b202040'}`, borderRadius: '12px', padding: '24px' }}>
@@ -144,7 +192,7 @@ export default function ProfitPage() {
             Rs. {netProfit.toLocaleString()}
           </div>
           <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>
-            Available for partner distribution
+            {isAllTime ? 'Total lifetime profit to distribute' : 'Available for partner distribution'}
           </p>
         </div>
       </div>
@@ -154,7 +202,7 @@ export default function ProfitPage() {
         {/* Distribution Table */}
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff', marginBottom: '16px' }}>
-            Partner Payout Breakdown
+            Partner Payout Breakdown {isAllTime ? '— All Time' : `(${periodLabel})`}
           </h3>
           {isLoading ? (
             <div style={{ padding: '32px', textAlign: 'center', color: '#6b6b6b' }}>Loading partner distribution...</div>
@@ -196,7 +244,7 @@ export default function ProfitPage() {
         {/* Distribution Chart */}
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff', marginBottom: '16px' }}>
-            Share Distribution Chart
+            Share Distribution Chart {isAllTime ? '— All Time' : `(${periodLabel})`}
           </h3>
           {isLoading ? (
             <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b6b6b' }}>
