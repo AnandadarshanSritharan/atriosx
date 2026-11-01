@@ -81,6 +81,7 @@ export default function ProfitPage() {
               <option value="last_month">Last Month</option>
               <option value="week">This Week</option>
               <option value="today">Today</option>
+              <option value="all">Total Analysis (Since Opening)</option>
             </select>
             <button
               onClick={handleExport}

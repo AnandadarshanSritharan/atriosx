@@ -14,6 +14,7 @@ const PERIOD_OPTIONS = [
   { value: 'week', label: 'This Week' },
   { value: 'month', label: 'This Month' },
   { value: 'last_month', label: 'Last Month' },
+  { value: 'all', label: 'Total Analysis' },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -88,7 +89,8 @@ export default function DashboardPage() {
   }));
 
   const fmt = (n: number | undefined) => n !== undefined ? `Rs. ${Number(n).toLocaleString()}` : '—';
-  const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || 'Selected Period';
+  const isAllTime = period === 'all';
+  const periodLabel = isAllTime ? 'All Time' : (PERIOD_OPTIONS.find(p => p.value === period)?.label || 'Selected Period');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -99,30 +101,71 @@ export default function DashboardPage() {
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#ffffff', marginBottom: '4px', letterSpacing: '-0.02em' }}>Dashboard</h1>
           <p style={{ color: '#6b6b6b', fontSize: '0.85rem' }}>Welcome back. Here's your business overview.</p>
         </div>
-        <div style={{ display: 'flex', gap: '4px', background: '#111111', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '4px' }}>
-          {PERIOD_OPTIONS.map(opt => (
-            <button key={opt.value} onClick={() => setPeriod(opt.value)} style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer',
-              fontSize: '0.75rem', fontWeight: 600, transition: 'all 0.15s',
-              background: period === opt.value ? '#c0c0c0' : 'transparent',
-              color: period === opt.value ? '#000000' : '#6b6b6b',
-            }}>
-              {opt.label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '6px', background: '#111111', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {PERIOD_OPTIONS.map(opt => {
+            const isTotal = opt.value === 'all';
+            const isActive = period === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setPeriod(opt.value)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: isTotal ? (isActive ? '1px solid #3d85c8' : '1px solid #1e3a5f') : 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  fontWeight: isTotal ? 700 : 600,
+                  transition: 'all 0.15s',
+                  background: isActive
+                    ? (isTotal ? '#3d85c8' : '#c0c0c0')
+                    : (isTotal ? '#131e2b' : 'transparent'),
+                  color: isActive
+                    ? (isTotal ? '#ffffff' : '#000000')
+                    : (isTotal ? '#64b5f6' : '#6b6b6b'),
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                {isTotal && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isActive ? '#ffffff' : '#64b5f6' }} />}
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {/* Total Analysis Banner */}
+      {isAllTime && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 18px',
+          background: 'linear-gradient(90deg, #14233a 0%, #111111 100%)',
+          border: '1px solid #1e3a5f',
+          borderRadius: '10px',
+          fontSize: '0.82rem',
+          color: '#90caf9',
+        }}>
+          <Activity size={18} color="#64b5f6" />
+          <span>
+            <strong>Total Analysis Active:</strong> Showing all-time business figures generated since launch (cumulative bookings, revenue, and profit).
+          </span>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-        <StatCard title="Bookings" value={stats?.periodBookings ?? stats?.todayBookings ?? 0} icon={Calendar} loading={isLoading} color="#3d85c8" sub={periodLabel} />
-        <StatCard title="Revenue" value={fmt(stats?.periodRevenue ?? stats?.todayRevenue ?? 0)} icon={DollarSign} loading={isLoading} color="#2d7a4f" sub={periodLabel} />
+        <StatCard title="Bookings" value={stats?.periodBookings ?? stats?.todayBookings ?? 0} icon={Calendar} loading={isLoading} color="#3d85c8" sub={isAllTime ? 'Total Since Opening' : periodLabel} />
+        <StatCard title="Revenue" value={fmt(stats?.periodRevenue ?? stats?.todayRevenue ?? 0)} icon={DollarSign} loading={isLoading} color="#2d7a4f" sub={isAllTime ? 'Total Generated Since Opening' : periodLabel} />
         <StatCard title="Upcoming" value={stats?.upcomingBookings ?? 0} icon={Clock} loading={isLoading} color="#d4a017" sub="Scheduled ahead" />
-        <StatCard title="Completed" value={stats?.completedBookings ?? stats?.completedToday ?? 0} icon={CheckCircle2} loading={isLoading} color="#2d7a4f" sub={periodLabel} />
-        <StatCard title="No Shows" value={stats?.noShows ?? stats?.noShowsToday ?? 0} icon={XCircle} loading={isLoading} color="#8b2020" sub={periodLabel} />
-        <StatCard title="Pending" value={stats?.pendingBookings ?? 0} icon={AlertCircle} loading={isLoading} color="#d4a017" sub={periodLabel} />
+        <StatCard title="Completed" value={stats?.completedBookings ?? stats?.completedToday ?? 0} icon={CheckCircle2} loading={isLoading} color="#2d7a4f" sub={isAllTime ? 'All-Time Completed' : periodLabel} />
+        <StatCard title="No Shows" value={stats?.noShows ?? stats?.noShowsToday ?? 0} icon={XCircle} loading={isLoading} color="#8b2020" sub={isAllTime ? 'All-Time No Shows' : periodLabel} />
+        <StatCard title="Pending" value={stats?.pendingBookings ?? 0} icon={AlertCircle} loading={isLoading} color="#d4a017" sub={isAllTime ? 'All-Time Pending' : periodLabel} />
         <StatCard title="Monthly Revenue" value={fmt(stats?.monthlyRevenue ?? 0)} icon={TrendingUp} loading={isLoading} color="#c0c0c0" sub="Current Month" />
-        <StatCard title="Net Profit" value={fmt(stats?.netProfit ?? 0)} icon={Activity} loading={isLoading} color="#c0c0c0" sub={periodLabel} />
+        <StatCard title="Net Profit" value={fmt(stats?.netProfit ?? 0)} icon={Activity} loading={isLoading} color="#c0c0c0" sub={isAllTime ? 'Total Net Profit' : periodLabel} />
       </div>
 
       {/* Charts Row */}
@@ -130,7 +173,9 @@ export default function DashboardPage() {
 
         {/* Revenue chart */}
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px', minHeight: '300px' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff', marginBottom: '20px' }}>Revenue — Last 30 Days</h3>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff', marginBottom: '20px' }}>
+            {isAllTime ? 'Revenue Trend — All Time (Since Opening)' : 'Revenue — Last 30 Days'}
+          </h3>
           {revenueChartData && revenueChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={revenueChartData}>
@@ -156,7 +201,9 @@ export default function DashboardPage() {
 
         {/* Facility performance */}
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px', minHeight: '300px' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff', marginBottom: '20px' }}>Facility Performance</h3>
+          <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#ffffff', marginBottom: '20px' }}>
+            Facility Performance {isAllTime ? '— All Time' : `(${periodLabel})`}
+          </h3>
           {facilityPerf && facilityPerf.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={facilityPerf} layout="vertical" margin={{ left: 0 }}>

@@ -22,6 +22,10 @@ function parseDateRange(query: any): { start: Date; end: Date } {
     case 'yesterday': { const y = new Date(now); y.setDate(y.getDate() - 1); return { start: startOfDay(y), end: endOfDay(y) }; }
     case 'week': return { start: startOfWeek(now), end: endOfWeek(now) };
     case 'last_month': { const lm = subMonths(now, 1); return { start: startOfMonth(lm), end: endOfMonth(lm) }; }
+    case 'all':
+    case 'all_time':
+    case 'total':
+      return { start: new Date('2020-01-01T00:00:00.000Z'), end: new Date('2099-12-31T23:59:59.999Z') };
     case 'month':
     default: return { start: startOfMonth(now), end: endOfMonth(now) };
   }
@@ -78,25 +82,38 @@ router.get('/dashboard', async (req, res) => {
       .filter(b => ['completed', 'confirmed'].includes(b.status))
       .reduce((s, b) => s + (b.total || 0), 0);
 
-    // Revenue chart: last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-    const last30Bookings = await Booking.find({
-      date: { $gte: format(thirtyDaysAgo, 'yyyy-MM-dd'), $lte: today },
-      status: { $in: ['completed', 'confirmed'] },
-      archived: false,
-    }).select('date total');
+    // Revenue chart: if all-time, aggregate all confirmed/completed bookings; otherwise last 30 days
+    let revenueChart: Array<{ date: string; revenue: number }> = [];
+    const isAllTime = req.query.period === 'all' || req.query.period === 'all_time' || req.query.period === 'total';
+    if (isAllTime) {
+      const allRevBookings = await Booking.find({
+        status: { $in: ['completed', 'confirmed'] },
+        archived: false,
+      }).select('date total').sort({ date: 1 });
+      const revMap: Record<string, number> = {};
+      allRevBookings.forEach(b => {
+        revMap[b.date] = (revMap[b.date] || 0) + (b.total || 0);
+      });
+      revenueChart = Object.entries(revMap).map(([date, revenue]) => ({ date, revenue })).sort((a, b) => a.date.localeCompare(b.date));
+    } else {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+      const last30Bookings = await Booking.find({
+        date: { $gte: format(thirtyDaysAgo, 'yyyy-MM-dd'), $lte: today },
+        status: { $in: ['completed', 'confirmed'] },
+        archived: false,
+      }).select('date total');
 
-    const revenueByDate: Record<string, number> = {};
-    last30Bookings.forEach(b => {
-      revenueByDate[b.date] = (revenueByDate[b.date] || 0) + (b.total || 0);
-    });
-    const revenueChart = [];
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = format(d, 'yyyy-MM-dd');
-      revenueChart.push({ date: dateStr, revenue: revenueByDate[dateStr] || 0 });
+      const revenueByDate: Record<string, number> = {};
+      last30Bookings.forEach(b => {
+        revenueByDate[b.date] = (revenueByDate[b.date] || 0) + (b.total || 0);
+      });
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = format(d, 'yyyy-MM-dd');
+        revenueChart.push({ date: dateStr, revenue: revenueByDate[dateStr] || 0 });
+      }
     }
 
     res.json({
@@ -280,7 +297,12 @@ router.get('/facility-performance', async (req, res) => {
       const noShows = bookings.filter(b => b.status === 'no_show').length;
 
       // Calculate utilization
-      const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      let days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (req.query.period === 'all' || req.query.period === 'total' || req.query.period === 'all_time') {
+        const earliest = await Booking.findOne({ archived: false }).sort({ date: 1 }).select('date');
+        const startDay = earliest?.date ? parseISO(earliest.date) : new Date();
+        days = Math.max(1, Math.ceil((new Date().getTime() - startDay.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      }
       const dailyHours = 12; // approximate operating hours
       const availableHours = days * dailyHours;
       const utilization = availableHours > 0 ? Math.round((totalHours / availableHours) * 100) : 0;

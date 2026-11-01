@@ -72,6 +72,7 @@ export default function RevenuePage() {
               <option value="week">This Week</option>
               <option value="month">This Month</option>
               <option value="last_month">Last Month</option>
+              <option value="all">Total Analysis (Since Opening)</option>
             </select>
             <input
               type="date"
