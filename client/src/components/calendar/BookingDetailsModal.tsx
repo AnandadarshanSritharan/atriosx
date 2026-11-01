@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { bookingsApi } from '@/api/bookings';
 import { BookingStatusBadge } from '@/components/shared/BookingStatusBadge';
-import { useUpdateBookingStatus, useCheckIn } from '@/hooks/useBookings';
+import { useCheckIn } from '@/hooks/useBookings';
 import { TimePicker12 } from '@/components/shared/TimePicker12';
 import { Clock, Zap, ArrowRight, CheckCircle, AlertTriangle, X, Play } from 'lucide-react';
 import { format } from 'date-fns';
@@ -16,20 +16,17 @@ interface BookingDetailsModalProps {
 
 export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation }: BookingDetailsModalProps) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState(booking?.status || 'pending');
   const [showEndSession, setShowEndSession] = useState(false);
   const [customEndTime, setCustomEndTime] = useState('');
   const [customPrice, setCustomPrice] = useState<string>('');
   const [priceOverride, setPriceOverride] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const { mutate: updateStatus, isPending: updating } = useUpdateBookingStatus();
   const { mutate: checkIn, isPending: checkingIn } = useCheckIn();
 
   // Reset states when booking opens
   useEffect(() => {
     if (booking) {
-      setStatus(booking.status || 'pending');
       setShowEndSession(false);
       setErrorMsg('');
       setPriceOverride(false);
@@ -94,10 +91,6 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
     setPriceOverride(false);
   };
 
-  // Handler: Save status dropdown
-  const handleSaveStatus = () => {
-    updateStatus({ id: booking._id, status }, { onSuccess: () => onClose() });
-  };
 
   // Handler: Check in
   const handleCheckIn = () => {
@@ -429,7 +422,7 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
                   }}
                 >
                   <Zap size={16} />
-                  Finish & Switch to Cockpit / Carrom
+                  Switch
                 </button>
               )}
 
@@ -451,53 +444,6 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
             </div>
           </div>
         )}
-
-        {/* Regular Status Update Controls */}
-        <div style={{ borderTop: '1px solid #222222', paddingTop: '16px' }}>
-          <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 700, color: '#8b8b8b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-            Update Status
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <select
-              value={status}
-              onChange={e => setStatus(e.target.value)}
-              style={{
-                flex: 1,
-                padding: '10px 12px',
-                background: '#161616',
-                border: '1px solid #2a2a2a',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '0.85rem',
-                outline: 'none',
-                cursor: 'pointer',
-                colorScheme: 'dark',
-              }}
-            >
-              <option value="pending">Pending</option>
-              <option value="confirmed">Ongoing</option>
-              <option value="completed">Completed</option>
-              <option value="no_show">No Show</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <button
-              onClick={handleSaveStatus}
-              disabled={updating}
-              style={{
-                padding: '10px 18px',
-                background: '#2a2a2a',
-                border: '1px solid #3a3a3a',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                cursor: updating ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {updating ? 'Saving...' : 'Save'}
-            </button>
-          </div>
-        </div>
 
         {/* Footer Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '20px' }}>
