@@ -62,9 +62,9 @@ export default function DashboardPage() {
   const { data: stats, isLoading } = useDashboard(period);
   const navigate = useNavigate();
 
-  const { data: revenueChartData } = useQuery({
-    queryKey: ['revenue-chart-30d'],
-    queryFn: () => reportsApi.revenue({ period: 'month' }).then(r => r.data.data?.daily || []),
+  const { data: revenueRes } = useQuery({
+    queryKey: ['revenue-chart-30d', period],
+    queryFn: () => reportsApi.revenue({ period: period === 'today' || period === 'yesterday' ? 'month' : period }).then(r => r.data.data),
   });
 
   const { data: recentBookings } = useQuery({
@@ -72,12 +72,23 @@ export default function DashboardPage() {
     queryFn: () => bookingsApi.getAll({ limit: 8, sort: '-createdAt' }).then(r => r.data.data),
   });
 
-  const { data: facilityPerf } = useQuery({
-    queryKey: ['facility-performance'],
-    queryFn: () => reportsApi.facilityPerformance({ period: 'month' }).then(r => r.data.data),
+  const { data: facilityPerfRes } = useQuery({
+    queryKey: ['facility-performance', period],
+    queryFn: () => reportsApi.facilityPerformance({ period: period === 'today' || period === 'yesterday' ? 'month' : period }).then(r => r.data.data),
   });
 
-  const fmt = (n: number | undefined) => n !== undefined ? `Rs. ${n.toLocaleString()}` : '—';
+  const revenueChartData = stats?.revenueChart?.length
+    ? stats.revenueChart
+    : (revenueRes?.chartData || []);
+
+  const facilityPerf = (facilityPerfRes || []).map((f: any) => ({
+    facility: f.facility?.name || f.name || 'Facility',
+    bookings: f.totalBookings ?? f.completedBookings ?? f.count ?? 0,
+    revenue: f.revenue ?? 0,
+  }));
+
+  const fmt = (n: number | undefined) => n !== undefined ? `Rs. ${Number(n).toLocaleString()}` : '—';
+  const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || 'Selected Period';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -104,14 +115,14 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-        <StatCard title="Bookings" value={stats?.todayBookings} icon={Calendar} loading={isLoading} color="#3d85c8" sub={`${period === 'today' ? 'Today' : ''}`} />
-        <StatCard title="Revenue" value={fmt(stats?.todayRevenue)} icon={DollarSign} loading={isLoading} color="#2d7a4f" />
-        <StatCard title="Upcoming" value={stats?.upcomingBookings} icon={Clock} loading={isLoading} color="#d4a017" />
-        <StatCard title="Completed" value={stats?.completedBookings} icon={CheckCircle2} loading={isLoading} color="#2d7a4f" />
-        <StatCard title="No Shows" value={stats?.noShows} icon={XCircle} loading={isLoading} color="#8b2020" />
-        <StatCard title="Pending" value={stats?.pendingBookings} icon={AlertCircle} loading={isLoading} color="#d4a017" />
-        <StatCard title="Monthly Revenue" value={fmt(stats?.monthlyRevenue)} icon={TrendingUp} loading={isLoading} color="#c0c0c0" />
-        <StatCard title="Net Profit" value={fmt(stats?.netProfit)} icon={Activity} loading={isLoading} color="#c0c0c0" />
+        <StatCard title="Bookings" value={stats?.periodBookings ?? stats?.todayBookings ?? 0} icon={Calendar} loading={isLoading} color="#3d85c8" sub={periodLabel} />
+        <StatCard title="Revenue" value={fmt(stats?.periodRevenue ?? stats?.todayRevenue ?? 0)} icon={DollarSign} loading={isLoading} color="#2d7a4f" sub={periodLabel} />
+        <StatCard title="Upcoming" value={stats?.upcomingBookings ?? 0} icon={Clock} loading={isLoading} color="#d4a017" sub="Scheduled ahead" />
+        <StatCard title="Completed" value={stats?.completedBookings ?? stats?.completedToday ?? 0} icon={CheckCircle2} loading={isLoading} color="#2d7a4f" sub={periodLabel} />
+        <StatCard title="No Shows" value={stats?.noShows ?? stats?.noShowsToday ?? 0} icon={XCircle} loading={isLoading} color="#8b2020" sub={periodLabel} />
+        <StatCard title="Pending" value={stats?.pendingBookings ?? 0} icon={AlertCircle} loading={isLoading} color="#d4a017" sub={periodLabel} />
+        <StatCard title="Monthly Revenue" value={fmt(stats?.monthlyRevenue ?? 0)} icon={TrendingUp} loading={isLoading} color="#c0c0c0" sub="Current Month" />
+        <StatCard title="Net Profit" value={fmt(stats?.netProfit ?? 0)} icon={Activity} loading={isLoading} color="#c0c0c0" sub={periodLabel} />
       </div>
 
       {/* Charts Row */}
@@ -188,11 +199,11 @@ export default function DashboardPage() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#161616'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                   <td style={{ padding: '12px', color: '#c0c0c0', fontWeight: 700, fontFamily: 'monospace' }}>{b.bookingNumber}</td>
-                  <td style={{ padding: '12px', color: '#ffffff' }}>{b.customer?.name || b.name}</td>
+                  <td style={{ padding: '12px', color: '#ffffff' }}>{b.customer?.name || b.name || 'Walk-in Guest'}</td>
                   <td style={{ padding: '12px', color: '#8b8b8b' }}>{b.facility?.name || '—'}</td>
                   <td style={{ padding: '12px', color: '#8b8b8b' }}>{b.date}</td>
                   <td style={{ padding: '12px', color: '#8b8b8b' }}>{b.startTime} – {b.endTime}</td>
-                  <td style={{ padding: '12px', color: '#ffffff', fontWeight: 600 }}>Rs. {b.totalAmount?.toLocaleString()}</td>
+                  <td style={{ padding: '12px', color: '#ffffff', fontWeight: 600 }}>Rs. {(b.total ?? b.totalAmount ?? 0).toLocaleString()}</td>
                   <td style={{ padding: '12px' }}>
                     <span style={{
                       padding: '3px 10px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 700,

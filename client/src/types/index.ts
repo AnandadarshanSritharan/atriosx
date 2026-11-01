@@ -256,6 +256,8 @@ export interface BusinessSettings {
 export interface DashboardStats {
   todayBookings: number;
   todayRevenue: number;
+  periodBookings?: number;
+  periodRevenue?: number;
   upcomingBookings: number;
   completedToday: number;
   completedBookings?: number;
@@ -263,9 +265,11 @@ export interface DashboardStats {
   noShows?: number;
   activeFacilities: number;
   pendingBookings: number;
+  confirmedBookings?: number;
   monthRevenue: number;
   monthlyRevenue?: number;
   monthExpenses: number;
+  periodExpenses?: number;
   netProfit: number;
   occupancyRate: number;
   revenueChart?: Array<{ date: string; revenue: number }>;

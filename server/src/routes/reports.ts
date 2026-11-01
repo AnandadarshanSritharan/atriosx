@@ -31,36 +31,52 @@ function parseDateRange(query: any): { start: Date; end: Date } {
 router.get('/dashboard', async (req, res) => {
   try {
     const today = format(new Date(), 'yyyy-MM-dd');
+    const { start: periodStart, end: periodEnd } = parseDateRange(req.query);
+    const startStr = format(periodStart, 'yyyy-MM-dd');
+    const endStr = format(periodEnd, 'yyyy-MM-dd');
+
+    // Also get current calendar month for baseline reference
     const { start: monthStart, end: monthEnd } = parseDateRange({ period: 'month' });
 
-    // Today stats
-    const [todayBookings, upcomingBookings, pendingBookings, activeFacilities] = await Promise.all([
-      Booking.find({ date: today, archived: false }),
-      Booking.countDocuments({ date: { $gt: today }, status: { $in: ['pending', 'confirmed'] }, archived: false }),
-      Booking.countDocuments({ status: 'pending', archived: false }),
-      Facility.countDocuments({ active: true, archived: false }),
-    ]);
+    // Period bookings query
+    const periodBookings = await Booking.find({
+      date: { $gte: startStr, $lte: endStr },
+      archived: false,
+    });
 
-    const todayRevenue = todayBookings
+    const periodRevenue = periodBookings
       .filter(b => ['completed', 'confirmed'].includes(b.status))
-      .reduce((s, b) => s + b.total, 0);
-    const completedToday = todayBookings.filter(b => b.status === 'completed').length;
-    const noShowsToday = todayBookings.filter(b => b.status === 'no_show').length;
+      .reduce((s, b) => s + (b.total || 0), 0);
 
-    // Monthly stats
+    const completedBookings = periodBookings.filter(b => b.status === 'completed').length;
+    const noShows = periodBookings.filter(b => b.status === 'no_show').length;
+    const pendingBookings = periodBookings.filter(b => b.status === 'pending').length;
+    const confirmedBookings = periodBookings.filter(b => b.status === 'confirmed').length;
+
+    // Upcoming bookings (bookings from tomorrow onwards or pending/confirmed in the future)
+    const upcomingBookings = await Booking.countDocuments({
+      date: { $gte: today },
+      status: { $in: ['pending', 'confirmed'] },
+      archived: false,
+    });
+
+    const activeFacilities = await Facility.countDocuments({ active: true, archived: false });
+
+    // Period expenses
+    const periodExpenses = await Expense.aggregate([
+      { $match: { date: { $gte: periodStart, $lte: periodEnd }, archived: false } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]);
+    const totalPeriodExpenses = periodExpenses[0]?.total || 0;
+
+    // Current month stats (for standard monthly revenue card if needed)
     const monthlyBookings = await Booking.find({
       date: { $gte: format(monthStart, 'yyyy-MM-dd'), $lte: format(monthEnd, 'yyyy-MM-dd') },
       archived: false,
     });
     const monthRevenue = monthlyBookings
       .filter(b => ['completed', 'confirmed'].includes(b.status))
-      .reduce((s, b) => s + b.total, 0);
-
-    const monthExpenses = await Expense.aggregate([
-      { $match: { date: { $gte: monthStart, $lte: monthEnd }, archived: false } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
-    ]);
-    const totalMonthExpenses = monthExpenses[0]?.total || 0;
+      .reduce((s, b) => s + (b.total || 0), 0);
 
     // Revenue chart: last 30 days
     const thirtyDaysAgo = new Date();
@@ -73,7 +89,7 @@ router.get('/dashboard', async (req, res) => {
 
     const revenueByDate: Record<string, number> = {};
     last30Bookings.forEach(b => {
-      revenueByDate[b.date] = (revenueByDate[b.date] || 0) + b.total;
+      revenueByDate[b.date] = (revenueByDate[b.date] || 0) + (b.total || 0);
     });
     const revenueChart = [];
     for (let i = 29; i >= 0; i--) {
@@ -86,17 +102,26 @@ router.get('/dashboard', async (req, res) => {
     res.json({
       success: true,
       data: {
-        todayBookings: todayBookings.length,
-        todayRevenue,
-        upcomingBookings,
-        completedToday,
-        noShowsToday,
-        activeFacilities,
+        // Dynamic stats for selected period
+        periodBookings: periodBookings.length,
+        periodRevenue,
+        completedBookings,
+        noShows,
         pendingBookings,
-        monthRevenue,
-        monthExpenses: totalMonthExpenses,
-        netProfit: monthRevenue - totalMonthExpenses,
-        occupancyRate: 0, // Calculated in facility-performance
+        confirmedBookings,
+        periodExpenses: totalPeriodExpenses,
+        netProfit: periodRevenue - totalPeriodExpenses,
+
+        // Backwards compatibility with previous field names
+        todayBookings: periodBookings.length,
+        todayRevenue: periodRevenue,
+        completedToday: completedBookings,
+        noShowsToday: noShows,
+
+        // Global metrics
+        upcomingBookings,
+        activeFacilities,
+        monthlyRevenue: monthRevenue,
         revenueChart,
       },
     });
