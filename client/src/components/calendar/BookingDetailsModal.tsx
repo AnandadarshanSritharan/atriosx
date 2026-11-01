@@ -51,29 +51,27 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
     },
   });
 
-  if (!isOpen || !booking) return null;
-
-  const totalDisplay = booking.totalAmount ?? booking.total ?? 0;
-  const durationDisplay = booking.durationMinutes ?? booking.duration ?? 60;
-  const customerName = booking.customer?.name || booking.name || 'Walk-in Customer';
-  const customerPhone = booking.customer?.phone || booking.phone || 'N/A';
-  const facilityName = booking.facility?.name || 'Assigned Facility';
-  const hourlyRate = booking.facility?.hourlyRate || booking.rateSnapshot || 600;
+  const totalDisplay = booking?.totalAmount ?? booking?.total ?? 0;
+  const durationDisplay = booking?.durationMinutes ?? booking?.duration ?? 60;
+  const customerName = booking?.customer?.name || booking?.name || 'Walk-in Customer';
+  const customerPhone = booking?.customer?.phone || booking?.phone || 'N/A';
+  const facilityName = booking?.facility?.name || 'Assigned Facility';
+  const hourlyRate = booking?.facility?.hourlyRate || booking?.rateSnapshot || 600;
 
   // Calculate actual duration in minutes based on booking.startTime and customEndTime
   const calculatedDuration = useMemo(() => {
-    if (!booking.startTime || !customEndTime) return durationDisplay;
+    if (!booking?.startTime || !customEndTime) return durationDisplay;
     const [sH, sM] = booking.startTime.split(':').map(Number);
     const [eH, eM] = customEndTime.split(':').map(Number);
-    const startMins = sH * 60 + sM;
-    let endMins = eH * 60 + eM;
+    const startMins = (sH || 0) * 60 + (sM || 0);
+    let endMins = (eH || 0) * 60 + (eM || 0);
     if (endMins < startMins) {
       // Crossed midnight or invalid
       endMins += 24 * 60;
     }
     const diff = endMins - startMins;
     return Math.max(1, diff);
-  }, [booking.startTime, customEndTime, durationDisplay]);
+  }, [booking?.startTime, customEndTime, durationDisplay]);
 
   // Calculate proportional price based on actual minutes
   const autoCalculatedPrice = useMemo(() => {
@@ -85,6 +83,9 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
 
   // The active price to be saved
   const finalPriceToSave = priceOverride && customPrice !== '' ? (Number(customPrice) || 0) : autoCalculatedPrice;
+
+  // Don't render modal DOM if closed or no booking selected
+  if (!isOpen || !booking) return null;
 
   // Handler: Set customEndTime to current time (⚡ Now)
   const handleSetEndNow = () => {
