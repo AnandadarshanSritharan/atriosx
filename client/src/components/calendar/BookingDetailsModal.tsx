@@ -53,7 +53,17 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
   const customerName = booking?.customer?.name || booking?.name || 'Walk-in Customer';
   const customerPhone = booking?.customer?.phone || booking?.phone || 'N/A';
   const facilityName = booking?.facility?.name || 'Assigned Facility';
-  const hourlyRate = booking?.facility?.hourlyRate || booking?.rateSnapshot || 600;
+  // Effective hourly rate for this booking (rateSnapshot or facility rate or current total adjusted to hourly)
+  const effectiveHourlyRate = useMemo(() => {
+    if (booking?.rateSnapshot && booking.rateSnapshot > 0) return booking.rateSnapshot;
+    if (booking?.facility?.hourlyRate && booking.facility.hourlyRate > 0) return booking.facility.hourlyRate;
+    const originalDur = booking?.durationMinutes ?? booking?.duration ?? 60;
+    const currentTot = booking?.totalAmount ?? booking?.total ?? 0;
+    if (originalDur > 0 && currentTot > 0) {
+      return (currentTot / originalDur) * 60;
+    }
+    return 600;
+  }, [booking]);
 
   // Calculate actual duration in minutes based on booking.startTime and customEndTime
   const calculatedDuration = useMemo(() => {
@@ -67,16 +77,15 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
       endMins += 24 * 60;
     }
     const diff = endMins - startMins;
-    return Math.max(1, diff);
+    return Math.max(0, diff);
   }, [booking?.startTime, customEndTime, durationDisplay]);
 
-  // Calculate proportional price based on actual minutes
+  // Exact per-minute price: (hourlyRate / 60) * minutes played (rounded to nearest rupee, zero floor)
   const autoCalculatedPrice = useMemo(() => {
-    // Pro-rata per minute calculation, rounded to nearest 5 or 10 rupees
-    const ratePerMin = hourlyRate / 60;
-    const raw = calculatedDuration * ratePerMin;
-    return Math.max(50, Math.round(raw / 10) * 10);
-  }, [calculatedDuration, hourlyRate]);
+    if (calculatedDuration <= 0) return 0;
+    const exactPrice = (effectiveHourlyRate / 60) * calculatedDuration;
+    return Math.round(exactPrice);
+  }, [calculatedDuration, effectiveHourlyRate]);
 
   // The active price to be saved
   const finalPriceToSave = priceOverride && customPrice !== '' ? (Number(customPrice) || 0) : autoCalculatedPrice;
@@ -321,6 +330,9 @@ export function BookingDetailsModal({ isOpen, onClose, booking, onSwitchStation 
                 </span>
                 <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#64b5f6' }}>
                   Rs. {autoCalculatedPrice.toLocaleString()}
+                </span>
+                <span style={{ fontSize: '0.68rem', color: '#8b8b8b', display: 'block' }}>
+                  (Rs. {Math.round(effectiveHourlyRate)}/hr · Rs. {(effectiveHourlyRate / 60).toFixed(2)}/min)
                 </span>
               </div>
             </div>
