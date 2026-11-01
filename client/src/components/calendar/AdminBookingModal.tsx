@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCreateBooking } from '@/hooks/useBookings';
 import { Zap, Clock, AlertCircle, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { TimePicker12 } from '@/components/shared/TimePicker12';
 
 interface AdminBookingModalProps {
   isOpen: boolean;
@@ -321,24 +322,9 @@ export function AdminBookingModal({ isOpen, onClose, initialData, facilities = [
                   ⚡ Now
                 </button>
               </div>
-              <input
-                type="text"
-                placeholder="e.g. 8.27 or 14:15"
-                value={timeInput}
-                onChange={e => setTimeInput(e.target.value)}
-                onBlur={() => setTimeInput(normalizeTimeString(timeInput))}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  background: '#0a0a0a',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: '8px',
-                  color: '#ffffff',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
+              <TimePicker12
+                value={formattedStartTime}
+                onChange={val => setTimeInput(val)}
               />
             </div>
           </div>

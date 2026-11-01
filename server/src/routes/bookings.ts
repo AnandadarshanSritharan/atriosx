@@ -545,13 +545,16 @@ router.put('/:id', authenticate, authorize('superadmin', 'manager', 'admin'), as
     if (bookingSource !== undefined) booking.bookingSource = bookingSource;
     if (paymentStatus !== undefined) booking.paymentStatus = paymentStatus;
     if (paymentMethod !== undefined) booking.paymentMethod = paymentMethod;
+    if (req.body.status && ['pending', 'confirmed', 'completed', 'cancelled', 'no_show'].includes(req.body.status)) {
+      booking.status = req.body.status;
+    }
     booking.updatedBy = req.user._id;
 
     booking.auditTrail.push({
       action: 'updated',
       by: req.user._id,
       at: new Date(),
-      note: 'Booking edited by admin',
+      note: req.body.status ? `Booking updated and status set to ${req.body.status}` : 'Booking edited by admin',
     });
 
     await booking.save();

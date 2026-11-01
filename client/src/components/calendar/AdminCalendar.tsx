@@ -296,6 +296,18 @@ export default function AdminCalendar({ externalOpenModal, onExternalModalClose 
           isOpen={modalState.type === 'detail'}
           onClose={handleCloseModal}
           booking={modalState.data}
+          onSwitchStation={(oldBooking, newStartTime) => {
+            setModalState({
+              type: 'new',
+              data: {
+                date: oldBooking.date || format(new Date(), 'yyyy-MM-dd'),
+                startTime: newStartTime || format(new Date(), 'HH:mm'),
+                name: oldBooking.customer?.name || oldBooking.name || '',
+                phone: oldBooking.customer?.phone || oldBooking.phone || '',
+                notes: `Switched from ${oldBooking.facility?.name || 'previous station'} (${oldBooking.bookingNumber})`,
+              },
+            });
+          }}
         />
 
         <CalendarAlerts
