@@ -5,10 +5,22 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Download, Calendar, DollarSign, Activity } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
 
+const PERIOD_OPTIONS = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'This Month' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'all', label: 'Total Analysis' },
+];
+
 export default function RevenuePage() {
   const [period, setPeriod] = useState('month');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  const isAllTime = period === 'all';
+  const periodLabel = isAllTime ? 'All Time' : (PERIOD_OPTIONS.find(p => p.value === period)?.label || 'Selected Period');
 
   const { data: revenueRes, isLoading: loadingRevenue } = useQuery({
     queryKey: ['reports', 'revenue', period, dateFrom, dateTo],
@@ -53,64 +65,81 @@ export default function RevenuePage() {
         subtitle="Track lounge revenue, transaction trends, and facility yield"
         actions={
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <select
-              value={period}
-              onChange={e => { setPeriod(e.target.value); setDateFrom(''); setDateTo(''); }}
-              style={{
-                padding: '9px 14px',
-                background: '#161616',
-                border: '1px solid #2a2a2a',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '0.85rem',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="last_month">Last Month</option>
-              <option value="all">Total Analysis (Since Opening)</option>
-            </select>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)}
-              style={{
-                padding: '9px 14px',
-                background: '#161616',
-                border: '1px solid #2a2a2a',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '0.85rem',
-                outline: 'none',
-                colorScheme: 'dark',
-              }}
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => setDateTo(e.target.value)}
-              style={{
-                padding: '9px 14px',
-                background: '#161616',
-                border: '1px solid #2a2a2a',
-                borderRadius: '8px',
-                color: '#ffffff',
-                fontSize: '0.85rem',
-                outline: 'none',
-                colorScheme: 'dark',
-              }}
-            />
+            <div style={{ display: 'flex', gap: '4px', background: '#111111', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {PERIOD_OPTIONS.map(opt => {
+                const isTotal = opt.value === 'all';
+                const isActive = period === opt.value && !dateFrom && !dateTo;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setPeriod(opt.value); setDateFrom(''); setDateTo(''); }}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '6px',
+                      border: isTotal ? (isActive ? '1px solid #3d85c8' : '1px solid #1e3a5f') : 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: isTotal ? 700 : 600,
+                      transition: 'all 0.15s',
+                      background: isActive
+                        ? (isTotal ? '#3d85c8' : '#c0c0c0')
+                        : (isTotal ? '#131e2b' : 'transparent'),
+                      color: isActive
+                        ? (isTotal ? '#ffffff' : '#000000')
+                        : (isTotal ? '#64b5f6' : '#6b6b6b'),
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {isTotal && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isActive ? '#ffffff' : '#64b5f6' }} />}
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  background: '#161616',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '7px',
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  outline: 'none',
+                  colorScheme: 'dark',
+                }}
+              />
+              <span style={{ color: '#4b4b4b', fontSize: '0.8rem' }}>–</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  background: '#161616',
+                  border: '1px solid #2a2a2a',
+                  borderRadius: '7px',
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  outline: 'none',
+                  colorScheme: 'dark',
+                }}
+              />
+            </div>
+
             <button
               onClick={handleExport}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '10px 18px',
+                padding: '8px 16px',
                 background: '#c0c0c0',
                 border: 'none',
                 borderRadius: '8px',
@@ -126,6 +155,26 @@ export default function RevenuePage() {
         }
       />
 
+      {/* Total Analysis Banner */}
+      {isAllTime && !dateFrom && !dateTo && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 18px',
+          background: 'linear-gradient(90deg, #14233a 0%, #111111 100%)',
+          border: '1px solid #1e3a5f',
+          borderRadius: '10px',
+          fontSize: '0.82rem',
+          color: '#90caf9',
+        }}>
+          <Activity size={18} color="#64b5f6" />
+          <span>
+            <strong>Total Analysis Active:</strong> Showing cumulative all-time revenue generated since opening the business.
+          </span>
+        </div>
+      )}
+
       {/* Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '20px' }}>
@@ -135,7 +184,9 @@ export default function RevenuePage() {
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff' }}>
             Rs. {totalRevenue.toLocaleString()}
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>For selected period</p>
+          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>
+            {isAllTime ? 'Total generated since opening' : 'For selected period'}
+          </p>
         </div>
 
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '20px' }}>
@@ -145,7 +196,9 @@ export default function RevenuePage() {
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff' }}>
             {bookingCount}
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>Paid / Confirmed reservations</p>
+          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>
+            {isAllTime ? 'Total lifetime reservations' : 'Paid / Confirmed reservations'}
+          </p>
         </div>
 
         <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '20px' }}>
@@ -165,14 +218,16 @@ export default function RevenuePage() {
           <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#ffffff' }}>
             Rs. {highestDayRevenue.toLocaleString()}
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>Highest single day intake</p>
+          <p style={{ fontSize: '0.75rem', color: '#4b4b4b', marginTop: '6px' }}>
+            {isAllTime ? 'Highest single day in business history' : 'Highest single day intake'}
+          </p>
         </div>
       </div>
 
       {/* Daily Revenue Area Chart */}
       <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff', marginBottom: '20px' }}>
-          Revenue Trend
+          {isAllTime ? 'Revenue Trend — All Time (Since Opening)' : 'Revenue Trend'}
         </h3>
         {loadingRevenue ? (
           <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b6b6b' }}>
@@ -203,7 +258,7 @@ export default function RevenuePage() {
       {/* Facility Performance Table */}
       <div style={{ background: '#111111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '24px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff', marginBottom: '16px' }}>
-          Revenue by Facility
+          Revenue by Facility {isAllTime ? '— All Time (Since Opening)' : `(${periodLabel})`}
         </h3>
         {loadingFacilities ? (
           <div style={{ padding: '24px', textAlign: 'center', color: '#6b6b6b' }}>Loading facilities...</div>
